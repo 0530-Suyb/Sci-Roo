@@ -76,6 +76,10 @@ import { CodeIndexManager } from "../../services/code-index/manager"
 import type { IndexProgressUpdate } from "../../services/code-index/interfaces/manager"
 import { MdmService } from "../../services/mdm/MdmService"
 import { SkillsManager } from "../../services/skills/SkillsManager"
+import { LiteratureManager } from "../../services/literature/LiteratureManager"
+import { DataStudioManager } from "../../services/data-studio/DataStudioManager"
+import { ResearchPipelineManager } from "../../services/research-pipeline/ResearchPipelineManager"
+import { PaperWritingManager } from "../../services/paper-writing/PaperWritingManager"
 
 import { fileExistsAtPath } from "../../utils/fs"
 import { setTtsEnabled, setTtsSpeed } from "../../utils/tts"
@@ -142,6 +146,10 @@ export class ClineProvider
 	private _workspaceTracker?: WorkspaceTracker // workSpaceTracker read-only for access outside this class
 	protected mcpHub?: McpHub // Change from private to protected
 	protected skillsManager?: SkillsManager
+	protected literatureManager?: LiteratureManager
+	protected dataStudioManager?: DataStudioManager
+	protected researchPipelineManager?: ResearchPipelineManager
+	protected paperWritingManager?: PaperWritingManager
 	private marketplaceManager: MarketplaceManager
 	private mdmService?: MdmService
 	private taskCreationCallback: (task: Task) => void
@@ -229,6 +237,17 @@ export class ClineProvider
 		this.skillsManager = new SkillsManager(this)
 		this.skillsManager.initialize().catch((error) => {
 			this.log(`Failed to initialize Skills Manager: ${error}`)
+		})
+
+		// Initialize Literature Manager for research paper management
+		this.literatureManager = new LiteratureManager(this)
+		this.literatureManager.initialize().catch((error) => {
+			this.log(`Failed to initialize Literature Manager: ${error}`)
+		})
+
+		this.dataStudioManager = new DataStudioManager(this)
+		this.dataStudioManager.initialize().catch((error) => {
+			this.log(`Failed to initialize Data Studio Manager: ${error}`)
 		})
 
 		this.marketplaceManager = new MarketplaceManager(this.context, this.customModesManager)
@@ -709,6 +728,12 @@ export class ClineProvider
 		this.mcpHub = undefined
 		await this.skillsManager?.dispose()
 		this.skillsManager = undefined
+		await this.literatureManager?.dispose()
+		this.literatureManager = undefined
+		await this.dataStudioManager?.dispose()
+		await this.researchPipelineManager?.dispose()
+		await this.paperWritingManager?.dispose()
+		this.dataStudioManager = undefined
 		this.marketplaceManager?.cleanup()
 		this.customModesManager?.dispose()
 		this.taskHistoryStore.dispose()
@@ -2749,6 +2774,22 @@ export class ClineProvider
 
 	public getSkillsManager(): SkillsManager | undefined {
 		return this.skillsManager
+	}
+
+	public getLiteratureManager(): LiteratureManager | undefined {
+		return this.literatureManager
+	}
+
+	public getDataStudioManager(): DataStudioManager | undefined {
+		return this.dataStudioManager
+	}
+
+	public getResearchPipelineManager(): ResearchPipelineManager | undefined {
+		return this.researchPipelineManager
+	}
+
+	public getPaperWritingManager(): PaperWritingManager | undefined {
+		return this.paperWritingManager
 	}
 
 	/**

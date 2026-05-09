@@ -1,0 +1,27 @@
+{
+	"title": "Research Pipeline",
+	"newProject": "New Project",
+	"create": "Create",
+	"cancel": "Cancel",
+	"projectName": "Project name...",
+	"description": "Description (optional)...",
+	"noProject": "No research project yet.",
+	"noProjectHint": "Create a project to track your research workflow.",
+	"currentStage": "Current Stage",
+	"hypotheses": "Hypotheses",
+	"newHypothesis": "New hypothesis...",
+	"experiments": "Experiments",
+	"notes": "Notes",
+	"addNote": "Add a note...",
+	"stages": {
+		"planning": "Planning",
+		"literature-review": "Literature",
+		"hypothesis-design": "Hypotheses",
+		"data-collection": "Data Collection",
+		"data-analysis": "Analysis",
+		"visualization": "Visualization",
+		"writing": "Writing",
+		"peer-review": "Review",
+		"published": "Published"
+	}
+}

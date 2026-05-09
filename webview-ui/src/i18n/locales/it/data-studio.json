@@ -1,0 +1,19 @@
+{
+	"title": "Data Studio",
+	"language": "Language",
+	"run": "Run",
+	"running": "Running...",
+	"output": "Output",
+	"errors": "Errors",
+	"files": "Files",
+	"runHistory": "Run History",
+	"noOutput": "Run code to see output.",
+	"noErrors": "No errors yet.",
+	"noFiles": "No generated files. Files (images, CSVs, etc.) saved to .roo/data-studio/ will appear here.",
+	"ctrlEnter": "Ctrl+Enter to run",
+	"editor.placeholder": "# Enter code here...\n# Examples:\n# Python: import pandas as pd; df = pd.read_csv('data.csv'); print(df.describe())\n# R: library(ggplot2); summary(mtcars)",
+	"pythonAvailable": "Python Available",
+	"pythonNA": "Python N/A",
+	"rAvailable": "R Available",
+	"rNA": "R N/A"
+}

@@ -107,3 +107,73 @@ export interface GenerateImageParams {
 	path: string
 	image?: string
 }
+
+export interface SearchLiteratureParams {
+	query: string
+	sources?: ("pubmed" | "arxiv" | "semantic-scholar")[]
+	maxResults?: number
+	yearFrom?: number
+	yearTo?: number
+}
+
+export interface LiteratureLibraryParams {
+	action: "add" | "remove" | "list" | "search" | "export" | "stats"
+	entryId?: string
+	query?: string
+	tags?: string[]
+	format?: "bibtex" | "json"
+	entry?: {
+		title: string
+		authors: Array<{ firstName: string; lastName: string }>
+		year?: number
+		journal?: string
+		doi?: string
+		abstract?: string
+		keywords?: string[]
+		tags?: string[]
+	}
+}
+
+export interface RunStatisticalTestParams {
+	code: string
+	language: "r" | "python"
+	explanation?: string
+}
+
+export interface GenerateFigureParams {
+	code: string
+	language: "r" | "python"
+	outputType: "png" | "svg" | "pdf"
+	filename?: string
+	width?: number
+	height?: number
+	title?: string
+	caption?: string
+}
+export interface GenerateManuscriptParams {
+	action: "create" | "update_section" | "generate_section" | "add_reference" | "format" | "export"
+	manuscriptId?: string
+	sectionType?:
+		| "title"
+		| "abstract"
+		| "introduction"
+		| "methods"
+		| "results"
+		| "discussion"
+		| "conclusion"
+		| "references"
+		| "cover-letter"
+		| "highlights"
+	sectionContent?: string
+	references?: string[]
+	title?: string
+	authors?: Array<{ firstName: string; lastName: string; affiliation?: string; isCorresponding: boolean }>
+	citationStyle?: "apa" | "vancouver" | "harvard" | "nature" | "science" | "ieee" | "chicago"
+	format?: "latex" | "docx" | "pdf" | "markdown"
+}
+
+export interface FormatCitationsParams {
+	citationIds: string[]
+	style: "apa" | "vancouver" | "harvard" | "nature" | "science" | "ieee" | "chicago"
+	format: "in-text" | "bibliography" | "both"
+}

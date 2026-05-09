@@ -144,6 +144,10 @@ export interface ExtensionStateContextType extends ExtensionState {
 	showWorktreesInHomeScreen: boolean
 	setShowWorktreesInHomeScreen: (value: boolean) => void
 	skills?: SkillMetadata[]
+	literatureLibrary?: any
+	dataStudioState?: any
+	researchPipelineState?: any
+	paperWritingState?: any
 }
 
 export const ExtensionStateContext = createContext<ExtensionStateContextType | undefined>(undefined)
@@ -282,6 +286,10 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 		global: {},
 	})
 	const [skills, setSkills] = useState<SkillMetadata[]>([])
+	const [literatureLibrary, setLiteratureLibrary] = useState<any>(undefined)
+	const [dataStudioState, setDataStudioState] = useState<any>(undefined)
+	const [researchPipelineState, setResearchPipelineState] = useState<any>(undefined)
+	const [paperWritingState, setPaperWritingState] = useState<any>(undefined)
 	const [includeTaskHistoryInEnhance, setIncludeTaskHistoryInEnhance] = useState(true)
 	const [prevCloudIsAuthenticated, setPrevCloudIsAuthenticated] = useState(false)
 	const [includeCurrentTime, setIncludeCurrentTime] = useState(true)
@@ -458,6 +466,30 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 					})
 					break
 				}
+				case "literatureState": {
+					if ((message as any).literatureState) {
+						setLiteratureLibrary((message as any).literatureState)
+					}
+					break
+				}
+				case "dataStudioState": {
+					if ((message as any).dataStudioState) {
+						setDataStudioState((message as any).dataStudioState)
+					}
+					break
+				}
+				case "researchPipelineState": {
+					if ((message as any).researchPipelineState) {
+						setResearchPipelineState((message as any).researchPipelineState)
+					}
+					break
+				}
+				case "paperWritingState": {
+					if ((message as any).paperWritingState) {
+						setPaperWritingState((message as any).paperWritingState)
+					}
+					break
+				}
 			}
 		},
 		[setListApiConfigMeta],
@@ -606,6 +638,10 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 		includeCurrentCost,
 		setIncludeCurrentCost,
 		skills,
+		literatureLibrary,
+		dataStudioState,
+		researchPipelineState,
+		paperWritingState,
 		showWorktreesInHomeScreen: state.showWorktreesInHomeScreen ?? true,
 		setShowWorktreesInHomeScreen: (value) =>
 			setState((prevState) => ({ ...prevState, showWorktreesInHomeScreen: value })),

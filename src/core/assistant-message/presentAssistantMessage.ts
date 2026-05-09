@@ -37,6 +37,10 @@ import { generateImageTool } from "../tools/GenerateImageTool"
 import { applyDiffTool as applyDiffToolClass } from "../tools/ApplyDiffTool"
 import { isValidToolName, validateToolUse } from "../tools/validateToolUse"
 import { codebaseSearchTool } from "../tools/CodebaseSearchTool"
+import { searchLiteratureTool } from "../tools/SearchLiteratureTool"
+import { literatureLibraryTool } from "../tools/LiteratureLibraryTool"
+import { runStatisticalTestTool } from "../tools/RunStatisticalTestTool"
+import { generateFigureTool } from "../tools/GenerateFigureTool"
 
 import { formatResponse } from "../prompts/responses"
 import { sanitizeToolUseId } from "../../utils/tool-id"
@@ -381,6 +385,14 @@ export async function presentAssistantMessage(cline: Task) {
 						return `[${block.name} for '${block.params.command}'${block.params.args ? ` with args: ${block.params.args}` : ""}]`
 					case "skill":
 						return `[${block.name} for '${block.params.skill}'${block.params.args ? ` with args: ${block.params.args}` : ""}]`
+					case "search_literature":
+						return `[${block.name} for '${block.params.query}']`
+					case "literature_library":
+						return `[${block.name} action: '${block.params.action}']`
+					case "run_statistical_test":
+						return `[${block.name} for '${block.params.code?.substring(0, 60)}...']`
+					case "generate_figure":
+						return `[${block.name}: ${block.params.title || block.params.outputType || "figure"}]`
 					case "generate_image":
 						return `[${block.name} for '${block.params.path}']`
 					default:
@@ -844,6 +856,34 @@ export async function presentAssistantMessage(cline: Task) {
 				case "generate_image":
 					await checkpointSaveAndMark(cline)
 					await generateImageTool.handle(cline, block as ToolUse<"generate_image">, {
+						askApproval,
+						handleError,
+						pushToolResult,
+					})
+					break
+				case "search_literature":
+					await searchLiteratureTool.handle(cline, block as ToolUse<"search_literature">, {
+						askApproval,
+						handleError,
+						pushToolResult,
+					})
+					break
+				case "literature_library":
+					await literatureLibraryTool.handle(cline, block as ToolUse<"literature_library">, {
+						askApproval,
+						handleError,
+						pushToolResult,
+					})
+					break
+				case "run_statistical_test":
+					await runStatisticalTestTool.handle(cline, block as ToolUse<"run_statistical_test">, {
+						askApproval,
+						handleError,
+						pushToolResult,
+					})
+					break
+				case "generate_figure":
+					await generateFigureTool.handle(cline, block as ToolUse<"generate_figure">, {
 						askApproval,
 						handleError,
 						pushToolResult,

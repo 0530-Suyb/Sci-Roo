@@ -103,6 +103,11 @@ export interface ExtensionMessage {
 		| "branchWorktreeIncludeResult"
 		| "folderSelected"
 		| "skills"
+		| "literatureState"
+		| "literatureExportResult"
+		| "dataStudioState"
+		| "researchPipelineState"
+		| "paperWritingState"
 		| "fileContent"
 	text?: string
 	/** For fileContent: { path, content, error? } */
@@ -118,6 +123,10 @@ export interface ExtensionMessage {
 		| "historyButtonClicked"
 		| "marketplaceButtonClicked"
 		| "cloudButtonClicked"
+		| "literatureButtonClicked"
+		| "dataStudioButtonClicked"
+		| "researchPipelineButtonClicked"
+		| "paperWritingButtonClicked"
 		| "didBecomeVisible"
 		| "focusInput"
 		| "switchTab"
@@ -180,6 +189,15 @@ export interface ExtensionMessage {
 	organizationId?: string | null // For organizationSwitchResult
 	tools?: SerializedCustomToolDefinition[] // For customToolsResult
 	skills?: SkillMetadata[] // For skills response
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	literatureState?: any // For literature library state response
+	literatureExportResult?: { format: string; content: string } // For literature export response
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	dataStudioState?: any // For data studio state response
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	researchPipelineState?: any // For research pipeline state response
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	paperWritingState?: any // For paper writing state response
 	modes?: { slug: string; name: string }[] // For modes response
 	aggregatedCosts?: {
 		// For taskWithAggregatedCosts response
@@ -501,6 +519,7 @@ export interface WebviewMessage {
 		| "lockApiConfigAcrossModes"
 		| "clearCloudAuthSkipModel"
 		| "cloudButtonClicked"
+		| "literatureButtonClicked"
 		| "rooCloudSignIn"
 		| "cloudLandingPageSignIn"
 		| "rooCloudSignOut"
@@ -581,6 +600,18 @@ export interface WebviewMessage {
 		| "moveSkill"
 		| "updateSkillModes"
 		| "openSkillFile"
+		| "literatureList"
+		| "literatureSearch"
+		| "literatureAdd"
+		| "literatureRemove"
+		| "literatureExport"
+		| "dataStudioRun"
+		| "dataStudioList"
+		| "researchPipelineRun"
+		| "researchPipelineList"
+		| "paperWritingAction"
+		| "paperWritingList"
+	action?: string
 	text?: string
 	taskId?: string
 	editedMessageContent?: string
@@ -610,6 +641,9 @@ export interface WebviewMessage {
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	values?: Record<string, any>
 	query?: string
+	tags?: string[]
+	entryId?: string
+	format?: string
 	setting?: string
 	slug?: string
 	modeConfig?: ModeConfig
@@ -806,6 +840,9 @@ export interface ClineSayTool {
 	lineNumber?: number
 	startLine?: number // Starting line for read_file operations (for navigation on click)
 	query?: string
+	tags?: string[]
+	entryId?: string
+	format?: string
 	batchFiles?: Array<{
 		path: string
 		lineSnippet: string

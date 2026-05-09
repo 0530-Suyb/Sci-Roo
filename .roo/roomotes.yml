@@ -1,5 +1,10 @@
 version: "1.0"
 
+project:
+  name: "Sci-Roo"
+  description: "AI-assisted one-stop research platform for the entire scientific workflow"
+  tagline: "Your AI Research Team, Right in Your Editor"
+
 commands:
     - name: Install dependencies
       run: pnpm install

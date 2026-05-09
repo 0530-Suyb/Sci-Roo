@@ -1,0 +1,25 @@
+{
+	"title": "Literature Library",
+	"search": {
+		"placeholder": "Search literature...",
+		"noResults": "No results found.",
+		"resultsFor": "Search results for"
+	},
+	"library": {
+		"empty": "Your literature library is empty.",
+		"emptyHint": "Use the Sci-Roo agent to search and add papers."
+	},
+	"stats": {
+		"papers": "papers",
+		"unread": "unread",
+		"tags": "tags"
+	},
+	"export": {
+		"bibtex": "BibTeX",
+		"json": "JSON"
+	},
+	"delete": {
+		"title": "Remove from library"
+	},
+	"unread": "Unread"
+}

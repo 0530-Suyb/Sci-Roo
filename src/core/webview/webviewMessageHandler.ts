@@ -40,6 +40,16 @@ import {
 	handleUpdateSkillModes,
 	handleOpenSkillFile,
 } from "./skillsMessageHandler"
+import {
+	handleLiteratureList,
+	handleLiteratureSearch,
+	handleLiteratureAdd,
+	handleLiteratureRemove,
+	handleLiteratureExport,
+} from "./literatureMessageHandler"
+import { handleDataStudioRun, handleDataStudioList } from "./dataStudioMessageHandler"
+import { handleResearchPipelineRun, handleResearchPipelineList } from "./researchPipelineMessageHandler"
+import { handlePaperWritingAction, handlePaperWritingList } from "./paperWritingMessageHandler"
 import { changeLanguage, t } from "../../i18n"
 import { Package } from "../../shared/package"
 import { type RouterName, toRouterName } from "../../shared/api"
@@ -3056,6 +3066,50 @@ export const webviewMessageHandler = async (
 		}
 		case "openSkillFile": {
 			await handleOpenSkillFile(provider, message)
+			break
+		}
+		case "literatureList": {
+			await handleLiteratureList(provider, message)
+			break
+		}
+		case "literatureSearch": {
+			await handleLiteratureSearch(provider, message)
+			break
+		}
+		case "literatureAdd": {
+			await handleLiteratureAdd(provider, message)
+			break
+		}
+		case "literatureRemove": {
+			await handleLiteratureRemove(provider, message)
+			break
+		}
+		case "literatureExport": {
+			await handleLiteratureExport(provider, message)
+			break
+		}
+		case "dataStudioRun": {
+			await handleDataStudioRun(provider, message)
+			break
+		}
+		case "dataStudioList": {
+			await handleDataStudioList(provider)
+			break
+		}
+		case "researchPipelineRun": {
+			await handleResearchPipelineRun(provider, message)
+			break
+		}
+		case "researchPipelineList": {
+			await handleResearchPipelineList(provider)
+			break
+		}
+		case "paperWritingAction": {
+			await handlePaperWritingAction(provider, message)
+			break
+		}
+		case "paperWritingList": {
+			await handlePaperWritingList(provider)
 			break
 		}
 		case "openCommandFile": {

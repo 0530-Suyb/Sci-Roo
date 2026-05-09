@@ -35,6 +35,10 @@ export const commandIds = [
 	"popoutButtonClicked",
 	"cloudButtonClicked",
 	"settingsButtonClicked",
+	"literatureButtonClicked",
+	"dataStudioButtonClicked",
+	"researchPipelineButtonClicked",
+	"paperWritingButtonClicked",
 
 	"openInNewTab",
 

@@ -14,6 +14,10 @@ import readCommandOutput from "./read_command_output"
 import { createReadFileTool, type ReadFileToolOptions } from "./read_file"
 import runSlashCommand from "./run_slash_command"
 import skill from "./skill"
+import searchLiterature from "./search_literature"
+import literatureLibrary from "./literature_library"
+import runStatisticalTest from "./run_statistical_test"
+import generateFigure from "./generate_figure"
 import searchReplace from "./search_replace"
 import edit_file from "./edit_file"
 import searchFiles from "./search_files"
@@ -61,6 +65,10 @@ export function getNativeTools(options: NativeToolsOptions = {}): OpenAI.Chat.Ch
 		createReadFileTool(readFileOptions),
 		runSlashCommand,
 		skill,
+		searchLiterature,
+		literatureLibrary,
+		runStatisticalTest,
+		generateFigure,
 		searchReplace,
 		edit_file,
 		editTool,

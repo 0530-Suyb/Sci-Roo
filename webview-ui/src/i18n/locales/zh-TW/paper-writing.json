@@ -1,0 +1,29 @@
+{
+	"title": "Paper Writing",
+	"newManuscript": "New",
+	"createManuscript": "Create",
+	"cancel": "Cancel",
+	"manuscriptTitle": "Manuscript title...",
+	"noManuscript": "No manuscript yet.",
+	"noManuscriptHint": "Create a manuscript to get started.",
+	"selectSection": "Select a section from the sidebar to start editing.",
+	"selectSectionHint": "Or create a new section below.",
+	"writeContent": "Write your paper with IMRaD structure and export to LaTeX or Markdown.",
+	"save": "Save",
+	"sectionTitle": "Section title...",
+	"sectionPlaceholder": "Write your section content here...",
+	"exportMarkdown": "Markdown",
+	"exportLatex": "LaTeX",
+	"references": "references",
+	"figures": "figures",
+	"tables": "tables",
+	"sections": {
+		"abstract": "Abstract",
+		"introduction": "Introduction",
+		"methods": "Methods",
+		"results": "Results",
+		"discussion": "Discussion",
+		"conclusion": "Conclusion",
+		"references": "References"
+	}
+}

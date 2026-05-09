@@ -81,6 +81,24 @@ export const toolParamNames = [
 	// read_file legacy format parameter (backward compatibility)
 	"files",
 	"line_ranges",
+	"code",
+	"language",
+	"output_type",
+	"explanation",
+	"filename",
+	"width",
+	"height",
+	"title",
+	"caption",
+	"section_type",
+	"section_content",
+	"references",
+	"authors",
+	"citation_style",
+	"citation_ids",
+	"style",
+	"format",
+	"manuscript_id",
 ] as const
 
 export type ToolParamName = (typeof toolParamNames)[number]
@@ -115,6 +133,10 @@ export type NativeToolArgs = {
 	switch_mode: { mode_slug: string; reason: string }
 	update_todo_list: { todos: string }
 	use_mcp_tool: { server_name: string; tool_name: string; arguments?: Record<string, unknown> }
+	search_literature: import("@roo-code/types").SearchLiteratureParams
+	literature_library: import("@roo-code/types").LiteratureLibraryParams
+	run_statistical_test: import("@roo-code/types").RunStatisticalTestParams
+	generate_figure: import("@roo-code/types").GenerateFigureParams
 	write_to_file: { path: string; content: string }
 	// Add more tools as they are migrated to native protocol
 }
@@ -290,6 +312,12 @@ export const TOOL_DISPLAY_NAMES: Record<ToolName, string> = {
 	skill: "load skill",
 	generate_image: "generate images",
 	custom_tool: "use custom tools",
+	search_literature: "search academic literature",
+	literature_library: "manage literature library",
+	run_statistical_test: "run statistical test",
+	generate_figure: "generate figures",
+	generate_manuscript: "generate manuscript",
+	format_citations: "format citations",
 } as const
 
 // Define available tool groups.
@@ -322,6 +350,10 @@ export const ALWAYS_AVAILABLE_TOOLS: ToolName[] = [
 	"update_todo_list",
 	"run_slash_command",
 	"skill",
+	"search_literature",
+	"literature_library",
+	"run_statistical_test",
+	"generate_figure",
 ] as const
 
 /**

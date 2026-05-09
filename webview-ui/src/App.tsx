@@ -20,11 +20,24 @@ import { CheckpointRestoreDialog } from "./components/chat/CheckpointRestoreDial
 import { DeleteMessageDialog, EditMessageDialog } from "./components/chat/MessageModificationConfirmationDialog"
 import ErrorBoundary from "./components/ErrorBoundary"
 import { CloudView } from "./components/cloud/CloudView"
+import LiteratureView from "./components/literature/LiteratureView"
+import DataStudioView from "./components/data-studio/DataStudioView"
+import ResearchPipelineView from "./components/research/ResearchPipelineView"
+import PaperWritingView from "./components/paper/PaperWritingView"
 import { useAddNonInteractiveClickListener } from "./components/ui/hooks/useNonInteractiveClick"
 import { TooltipProvider } from "./components/ui/tooltip"
 import { STANDARD_TOOLTIP_DELAY } from "./components/ui/standard-tooltip"
 
-type Tab = "settings" | "history" | "chat" | "marketplace" | "cloud"
+type Tab =
+	| "settings"
+	| "history"
+	| "chat"
+	| "marketplace"
+	| "cloud"
+	| "literature"
+	| "dataStudio"
+	| "researchPipeline"
+	| "paperWriting"
 
 interface DeleteMessageDialogState {
 	isOpen: boolean
@@ -50,6 +63,10 @@ const tabsByMessageAction: Partial<Record<NonNullable<ExtensionMessage["action"]
 	historyButtonClicked: "history",
 	marketplaceButtonClicked: "marketplace",
 	cloudButtonClicked: "cloud",
+	literatureButtonClicked: "literature",
+	dataStudioButtonClicked: "dataStudio",
+	researchPipelineButtonClicked: "researchPipeline",
+	paperWritingButtonClicked: "paperWriting",
 }
 
 const App = () => {
@@ -245,6 +262,10 @@ const App = () => {
 					organizations={cloudOrganizations}
 				/>
 			)}
+			{tab === "literature" && <LiteratureView onDone={() => switchTab("chat")} />}
+			{tab === "dataStudio" && <DataStudioView onDone={() => switchTab("chat")} />}
+			{tab === "researchPipeline" && <ResearchPipelineView onDone={() => switchTab("chat")} />}
+			{tab === "paperWriting" && <PaperWritingView onDone={() => switchTab("chat")} />}
 			<ChatView
 				ref={chatViewRef}
 				isHidden={tab !== "chat"}

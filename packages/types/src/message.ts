@@ -36,6 +36,12 @@ export const clineAsks = [
 	"mistake_limit_reached",
 	"use_mcp_server",
 	"auto_approval_max_req_reached",
+	"search_literature",
+	"literature_library",
+	"run_statistical_test",
+	"generate_figure",
+	"generate_manuscript",
+	"format_citations",
 ] as const
 
 export const clineAskSchema = z.enum(clineAsks)
