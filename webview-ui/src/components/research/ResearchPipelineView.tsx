@@ -25,12 +25,11 @@ const STAGE_LABELS: Record<string, { label: string; icon: React.ReactNode }> = {
 const ALL_STAGES = Object.keys(STAGE_LABELS)
 
 const ResearchPipelineView: React.FC<ResearchPipelineViewProps> = ({ onDone }) => {
-	const { t } = useAppTranslation()
+	const { t: _t } = useAppTranslation()
 	const { researchPipelineState } = useExtensionState()
 	const state = researchPipelineState || {}
 
 	const project = state.project
-	const projects = state.projects || []
 
 	const [showCreate, setShowCreate] = useState(false)
 	const [newName, setNewName] = useState("")
@@ -44,7 +43,7 @@ const ResearchPipelineView: React.FC<ResearchPipelineViewProps> = ({ onDone }) =
 
 	useEffect(() => {
 		handleRequestList()
-	}, [])
+	}, [handleRequestList])
 
 	const handleCreateProject = useCallback(() => {
 		if (!newName.trim()) return

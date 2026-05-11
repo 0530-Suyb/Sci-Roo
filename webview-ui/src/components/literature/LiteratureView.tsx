@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from "react"
-import { ArrowLeft, Search, Plus, Trash2, Download, BookOpen, Tag, ExternalLink } from "lucide-react"
+import { ArrowLeft, Search, Trash2, Download, BookOpen, Tag, ExternalLink } from "lucide-react"
 import { useAppTranslation } from "@/i18n/TranslationContext"
 import { useExtensionState } from "@/context/ExtensionStateContext"
 import { Tab, TabContent, TabHeader } from "../common/Tab"
@@ -62,10 +62,10 @@ const LiteratureView: React.FC<LiteratureViewProps> = ({ onDone }) => {
 	}, [])
 
 	// Request library on mount
-	// eslint-disable-next-line react-hooks/exhaustive-deps
+
 	React.useEffect(() => {
 		handleRequestLibrary()
-	}, [])
+	}, [handleRequestLibrary])
 
 	return (
 		<Tab>

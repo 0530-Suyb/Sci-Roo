@@ -1,6 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from "react"
 import { ArrowLeft, Play, Beaker, FileText, Clock, Loader2, Terminal, AlertCircle } from "lucide-react"
-import { useAppTranslation } from "@/i18n/TranslationContext"
 import { useExtensionState } from "@/context/ExtensionStateContext"
 import { Tab, TabContent, TabHeader } from "../common/Tab"
 import { Button } from "@/components/ui"
@@ -89,7 +88,7 @@ const DataStudioView: React.FC<DataStudioViewProps> = ({ onDone }) => {
 
 	useEffect(() => {
 		handleRequestList()
-	}, [])
+	}, [handleRequestList])
 
 	return (
 		<Tab>

@@ -21,12 +21,11 @@ const SECTION_TYPES = [
 ]
 
 const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone }) => {
-	const { t } = useAppTranslation()
+	const { t: _t } = useAppTranslation()
 	const { paperWritingState } = useExtensionState()
 	const state = paperWritingState || {}
 
 	const manuscript = state.current
-	const history = state.history || []
 
 	const [showCreate, setShowCreate] = useState(false)
 	const [newTitle, setNewTitle] = useState("")
@@ -40,7 +39,7 @@ const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone }) => {
 
 	useEffect(() => {
 		handleRequestList()
-	}, [])
+	}, [handleRequestList])
 
 	const handleCreateManuscript = useCallback(() => {
 		if (!newTitle.trim()) return
@@ -89,7 +88,7 @@ const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone }) => {
 				setSectionContent("")
 			}
 		},
-		[manuscript],
+		[manuscript, handleSelectSection],
 	)
 
 	return (

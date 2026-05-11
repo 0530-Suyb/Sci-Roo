@@ -1,189 +1,262 @@
-<p align="center">
-  <a href="https://marketplace.visualstudio.com/items?itemName=RooVeterinaryInc.roo-cline"><img src="https://img.shields.io/badge/VS_Code_Marketplace-007ACC?style=flat&logo=visualstudiocode&logoColor=white" alt="VS Code Marketplace"></a>
-  <a href="https://x.com/roocode"><img src="https://img.shields.io/badge/roocode-000000?style=flat&logo=x&logoColor=white" alt="X"></a>
-  <a href="https://youtube.com/@roocodeyt?feature=shared"><img src="https://img.shields.io/badge/YouTube-FF0000?style=flat&logo=youtube&logoColor=white" alt="YouTube"></a>
-  <a href="https://discord.gg/roocode"><img src="https://img.shields.io/badge/Join%20Discord-5865F2?style=flat&logo=discord&logoColor=white" alt="Join Discord"></a>
-  <a href="https://www.reddit.com/r/RooCode/"><img src="https://img.shields.io/badge/Join%20r%2FRooCode-FF4500?style=flat&logo=reddit&logoColor=white" alt="Join r/RooCode"></a>
-</p>
-<p align="center">
-  <em>Get help fast → <a href="https://discord.gg/roocode">Join Discord</a> • Prefer async? → <a href="https://www.reddit.com/r/RooCode/">Join r/RooCode</a></em>
-</p>
+# Sci-Roo 工程介绍
 
-# Roo Code
+Science Roo (Sci-Roo) — 一站式 AI 辅助科研平台，基于 Roo Code 增强，覆盖文献调研 → 假设设计 → 数据分析 → 可视化 → 论文写作 → 同行评审的完整科研工作流。
 
-> Your AI-Powered Dev Team, Right in Your Editor
+## 架构总览
 
-## What's New in v3.53.0
-
-> ### The Roo Code plugin is not going away.
->
-> You may have seen the [recent announcement](https://x.com/mattrubens/status/2046636598859559114) that Roo Code hit 3 million installs and the original team is going all-in on Roomote. We know that news was hard for a lot of you. This plugin means a lot to us and to you, and we hear you.
->
-> The good news: **a community team has stepped up to carry Roo Code forward**, and we're working with them on an official handoff so the plugin you rely on keeps getting maintained and improved.
-
-**What's new in this release:**
-
-- Add GPT-5.5 support via the OpenAI Codex provider.
-- Add Claude Opus 4.7 support on Vertex AI.
-- Add previous checkpoint navigation controls in chat so you can step back through prior checkpoints more easily.
-
-<details>
-  <summary>🌐 Available languages</summary>
-
-- [English](README.md)
-- [Català](locales/ca/README.md)
-- [Deutsch](locales/de/README.md)
-- [Español](locales/es/README.md)
-- [Français](locales/fr/README.md)
-- [हिंदी](locales/hi/README.md)
-- [Bahasa Indonesia](locales/id/README.md)
-- [Italiano](locales/it/README.md)
-- [日本語](locales/ja/README.md)
-- [한국어](locales/ko/README.md)
-- [Nederlands](locales/nl/README.md)
-- [Polski](locales/pl/README.md)
-- [Português (BR)](locales/pt-BR/README.md)
-- [Русский](locales/ru/README.md)
-- [Türkçe](locales/tr/README.md)
-- [Tiếng Việt](locales/vi/README.md)
-- [简体中文](locales/zh-CN/README.md)
-- [繁體中文](locales/zh-TW/README.md)
-- ...
-    </details>
-
----
-
-## What Can Roo Code Do For YOU?
-
-- Generate Code from natural language descriptions and specs
-- Adapt with Modes: Code, Architect, Ask, Debug, and Custom Modes
-- Refactor & Debug existing code
-- Write & Update documentation
-- Answer Questions about your codebase
-- Automate repetitive tasks
-- Utilize MCP Servers
-
-## Modes
-
-Roo Code adapts to how you work:
-
-- Code Mode: everyday coding, edits, and file ops
-- Architect Mode: plan systems, specs, and migrations
-- Ask Mode: fast answers, explanations, and docs
-- Debug Mode: trace issues, add logs, isolate root causes
-- Custom Modes: build specialized modes for your team or workflow
-
-Learn more: [Using Modes](https://docs.roocode.com/basic-usage/using-modes) • [Custom Modes](https://docs.roocode.com/advanced-usage/custom-modes)
-
-## Tutorial & Feature Videos
-
-<div align="center">
-
-|                                                                                                                                                                           |                                                                                                                                                                            |                                                                                                                                                                          |
-| :-----------------------------------------------------------------------------------------------------------------------------------------------------------------------: | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------: | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------: |
-| <a href="https://www.youtube.com/watch?v=Mcq3r1EPZ-4"><img src="https://img.youtube.com/vi/Mcq3r1EPZ-4/maxresdefault.jpg" width="100%"></a><br><b>Installing Roo Code</b> | <a href="https://www.youtube.com/watch?v=ZBML8h5cCgo"><img src="https://img.youtube.com/vi/ZBML8h5cCgo/maxresdefault.jpg" width="100%"></a><br><b>Configuring Profiles</b> | <a href="https://www.youtube.com/watch?v=r1bpod1VWhg"><img src="https://img.youtube.com/vi/r1bpod1VWhg/maxresdefault.jpg" width="100%"></a><br><b>Codebase Indexing</b>  |
-|    <a href="https://www.youtube.com/watch?v=iiAv1eKOaxk"><img src="https://img.youtube.com/vi/iiAv1eKOaxk/maxresdefault.jpg" width="100%"></a><br><b>Custom Modes</b>     |     <a href="https://www.youtube.com/watch?v=Ho30nyY332E"><img src="https://img.youtube.com/vi/Ho30nyY332E/maxresdefault.jpg" width="100%"></a><br><b>Checkpoints</b>      | <a href="https://www.youtube.com/watch?v=HmnNSasv7T8"><img src="https://img.youtube.com/vi/HmnNSasv7T8/maxresdefault.jpg" width="100%"></a><br><b>Context Management</b> |
-
-</div>
-<p align="center">
-<a href="https://docs.roocode.com/tutorial-videos">More quick tutorial and feature videos...</a>
-</p>
-
-## Resources
-
-- **[Documentation](https://docs.roocode.com):** The official guide to installing, configuring, and mastering Roo Code.
-- **[YouTube Channel](https://youtube.com/@roocodeyt?feature=shared):** Watch tutorials and see features in action.
-- **[Discord Server](https://discord.gg/roocode):** Join the community for real-time help and discussion.
-- **[Reddit Community](https://www.reddit.com/r/RooCode):** Share your experiences and see what others are building.
-- **[GitHub Issues](https://github.com/RooCodeInc/Roo-Code/issues):** Report bugs and track development.
-- **[Feature Requests](https://github.com/RooCodeInc/Roo-Code/discussions/categories/feature-requests?discussions_q=is%3Aopen+category%3A%22Feature+Requests%22+sort%3Atop):** Have an idea? Share it with the developers.
-
----
-
-## Local Setup & Development
-
-1. **Clone** the repo:
-
-```sh
-git clone https://github.com/RooCodeInc/Roo-Code.git
+```
+Sci-Roo/
+├── src/                          ← ★ 插件本体 (VS Code Extension)
+├── webview-ui/                   ← ★ React 前端 UI
+├── packages/                     ← 共享库 (types, core, cloud, telemetry...)
+├── apps/                         ← 独立应用 (web版、CLI、评测工具)
+├── mcp-servers/                  ← MCP 服务器 (PubMed, arXiv...)
+├── .roo/                         ← 科研模式/规则/技能配置
+├── scripts/                      ← 构建/安装脚本
+├── schemas/                      ← JSON Schema
+├── turbo.json                    ← Turborepo 构建流水线
+├── pnpm-workspace.yaml           ← pnpm 工作区定义
+└── tsconfig.json                 ← 根 TypeScript 配置
 ```
 
-2. **Install dependencies**:
+---
 
-```sh
-pnpm install
+## 核心包
+
+| 文件夹                        | 包名                          | 作用                                                   |
+| ----------------------------- | ----------------------------- | ------------------------------------------------------ |
+| `src/`                        | `sci-roo`                     | 插件后端：Agent 引擎、工具、LLM Provider、webview 通信 |
+| `webview-ui/`                 | `@roo-code/vscode-webview`    | 插件前端：React + Tailwind UI 面板                     |
+| `packages/types/`             | `@roo-code/types`             | 共享类型定义，所有包都依赖它                           |
+| `packages/core/`              | `@roo-code/core`              | 共享核心逻辑                                           |
+| `packages/telemetry/`         | `@roo-code/telemetry`         | 遥测/埋点                                              |
+| `packages/cloud/`             | `@roo-code/cloud`             | 云服务集成                                             |
+| `packages/ipc/`               | `@roo-code/ipc`               | 进程间通信                                             |
+| `packages/build/`             | `@roo-code/build`             | 构建配置                                               |
+| `packages/config-eslint/`     | `@roo-code/config-eslint`     | ESLint 共享配置                                        |
+| `packages/config-typescript/` | `@roo-code/config-typescript` | TypeScript 共享配置                                    |
+| `packages/evals/`             | `@roo-code/evals`             | 评测框架                                               |
+| `packages/vscode-shim/`       | `@roo-code/vscode-shim`       | VS Code API 垫片                                       |
+
+---
+
+## 应用
+
+| 文件夹                 | 包名                       | 作用               |
+| ---------------------- | -------------------------- | ------------------ |
+| `apps/cli/`            | `@roo-code/cli`            | 命令行工具         |
+| `apps/web-roo-code/`   | `@roo-code/web-roo-code`   | Web 版（Next.js）  |
+| `apps/web-evals/`      | `@roo-code/web-evals`      | 内部评测 Web 应用  |
+| `apps/vscode-e2e/`     | `@roo-code/vscode-e2e`     | VS Code 端到端测试 |
+| `apps/vscode-nightly/` | `@roo-code/vscode-nightly` | 每夜构建版         |
+
+---
+
+## 插件内部结构
+
+### `src/` 后端
+
+| 目录                              | 作用                                                                                                                                  |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/core/tools/`                 | Agent 工具（ApplyDiff、EditFile、ReadFile、ExecuteCommand、SearchLiterature、GenerateFigure、GenerateManuscript、FormatCitations...） |
+| `src/core/prompts/`               | 系统提示词构建，包含各模式的自定义指令生成                                                                                            |
+| `src/core/webview/`               | 前后端通信（ClineProvider 主控制器、messageHandler 消息分发）                                                                         |
+| `src/core/task/`                  | 任务执行引擎（Task.ts、工具调用循环）                                                                                                 |
+| `src/core/config/`                | 配置管理（ContextProxy、ProviderSettingsManager、CustomModesManager）                                                                 |
+| `src/core/assistant-message/`     | 助手消息渲染（工具调用描述、用户确认 UI）                                                                                             |
+| `src/core/checkpoints/`           | 任务检查点/回滚                                                                                                                       |
+| `src/services/literature/`        | 文献管理器（LiteratureManager）                                                                                                       |
+| `src/services/research-pipeline/` | 研究流水线管理器（ResearchPipelineManager）                                                                                           |
+| `src/services/paper-writing/`     | 论文写作管理器（PaperWritingManager）                                                                                                 |
+| `src/services/data-studio/`       | 数据工作室管理器（DataStudioManager）                                                                                                 |
+| `src/services/mcp/`               | MCP 协议 Hub（McpHub、McpServerManager）                                                                                              |
+| `src/services/skills/`            | 技能管理器（SkillsManager、skillInvocation）                                                                                          |
+| `src/services/code-index/`        | 代码索引（Qdrant 向量搜索）                                                                                                           |
+| `src/services/search/`            | 文件搜索（ripgrep）                                                                                                                   |
+| `src/activate/`                   | 扩展激活入口（extension.ts → activate/index.ts → registerCommands.ts）                                                                |
+| `src/api/providers/`              | 30+ LLM API 适配器（Anthropic、OpenAI、Gemini、DeepSeek...）                                                                          |
+| `src/shared/`                     | 共享工具（ExtensionState、WebviewMessage、ProfileValidator、modes、tools）                                                            |
+| `src/utils/`                      | 工具函数（Git、FS、日志、token 计数）                                                                                                 |
+| `src/i18n/`                       | 后端国际化（18 种语言）                                                                                                               |
+| `src/integrations/`               | 编辑器/终端/主题集成                                                                                                                  |
+
+### `webview-ui/` 前端
+
+| 目录                          | 作用                                                             |
+| ----------------------------- | ---------------------------------------------------------------- |
+| `src/components/chat/`        | 聊天界面（ChatView、ChatTextArea、TaskHeader、Markdown 渲染...） |
+| `src/components/settings/`    | 设置面板（SettingsView、API 配置、模型选择器...）                |
+| `src/components/literature/`  | 文献库面板（LiteratureView）                                     |
+| `src/components/data-studio/` | 数据工作室面板（DataStudioView）                                 |
+| `src/components/research/`    | 研究流水线面板（ResearchPipelineView）                           |
+| `src/components/paper/`       | 论文写作面板（PaperWritingView）                                 |
+| `src/components/marketplace/` | 市场面板                                                         |
+| `src/components/cloud/`       | 云服务面板                                                       |
+| `src/components/history/`     | 任务历史面板                                                     |
+| `src/components/welcome/`     | 欢迎页面                                                         |
+| `src/components/ui/`          | 基础 UI 组件（Button、Input、Dialog、Select...）                 |
+| `src/components/common/`      | 通用组件（CodeBlock、DiffView、MarkdownBlock、MermaidBlock...）  |
+| `src/context/`                | React 状态管理（ExtensionStateContext）                          |
+| `src/i18n/locales/`           | 18 种语言翻译文件                                                |
+| `src/hooks/`                  | 自定义 React Hooks                                               |
+
+---
+
+## 依赖关系
+
+```
+packages/types/          ← 所有包都引用它
+     ↓
+packages/core/  packages/telemetry/  packages/cloud/  packages/ipc/  ...
+     ↓
+src/ (插件后端)            ← 引用所有 packages/*
+     ↓  vscode.postMessage()
+webview-ui/ (插件前端)      ← 引用 packages/types
 ```
 
-3. **Run the extension**:
+---
 
-There are several ways to run the Roo Code extension:
+## 前端路由与通信
 
-### Development Mode (F5)
+### Tab 路由
 
-For active development, use VSCode's built-in debugging:
+`App.tsx` 中定义 `Tab` 类型：`"chat" | "settings" | "history" | "marketplace" | "cloud" | "literature" | "dataStudio" | "researchPipeline" | "paperWriting"`
 
-Press `F5` (or go to **Run** → **Start Debugging**) in VSCode. This will open a new VSCode window with the Roo Code extension running.
+通过 `tabsByMessageAction` 将后端消息映射到 Tab：
 
-- Changes to the webview will appear immediately.
-- Changes to the core extension will also hot reload automatically.
+| 后端 action                     | 前端 Tab           | 工具栏位置 |
+| ------------------------------- | ------------------ | ---------- |
+| `plusButtonClicked`             | `chat`             | 主栏 1     |
+| `researchPipelineButtonClicked` | `researchPipeline` | 主栏 2     |
+| `literatureButtonClicked`       | `literature`       | 主栏 3     |
+| `dataStudioButtonClicked`       | `dataStudio`       | 主栏 4     |
+| `paperWritingButtonClicked`     | `paperWriting`     | 主栏 5     |
+| `historyButtonClicked`          | `history`          | 溢出菜单   |
+| `popoutButtonClicked`           | (新标签页)         | 溢出菜单   |
+| `settingsButtonClicked`         | `settings`         | 溢出菜单   |
+| `cloudButtonClicked`            | `cloud`            | 溢出菜单   |
+| `marketplaceButtonClicked`      | `marketplace`      | 溢出菜单   |
 
-### Automated VSIX Installation
+### 数据流
 
-To build and install the extension as a VSIX package directly into VSCode:
+```
+用户点击按钮 → registerCommands.ts 触发命令
+  → ClineProvider.postMessageToWebview() 发送消息到前端
+    → App.tsx onMessage() 接收并切换 Tab
+      → 渲染对应组件（ChatView / LiteratureView / ResearchPipelineView ...）
 
-```sh
-pnpm install:vsix [-y] [--editor=<command>]
+前端用户操作 → vscode.postMessage() 发送消息到后端
+  → webviewMessageHandler.ts 分发处理
+    → 调用对应服务（LiteratureManager / ResearchPipelineManager / PaperWritingManager ...）
 ```
 
-This command will:
+### 关键文件
 
-- Ask which editor command to use (code/cursor/code-insiders) - defaults to 'code'
-- Uninstall any existing version of the extension.
-- Build the latest VSIX package.
-- Install the newly built VSIX.
-- Prompt you to restart VS Code for changes to take effect.
-
-Options:
-
-- `-y`: Skip all confirmation prompts and use defaults
-- `--editor=<command>`: Specify the editor command (e.g., `--editor=cursor` or `--editor=code-insiders`)
-
-### Manual VSIX Installation
-
-If you prefer to install the VSIX package manually:
-
-1.  First, build the VSIX package:
-    ```sh
-    pnpm vsix
-    ```
-2.  A `.vsix` file will be generated in the `bin/` directory (e.g., `bin/roo-cline-<version>.vsix`).
-3.  Install it manually using the VSCode CLI:
-    ```sh
-    code --install-extension bin/roo-cline-<version>.vsix
-    ```
+| 文件                                                 | 作用                                    |
+| ---------------------------------------------------- | --------------------------------------- |
+| `src/extension.ts`                                   | 扩展入口                                |
+| `src/activate/index.ts`                              | 激活逻辑                                |
+| `src/activate/registerCommands.ts`                   | VS Code 命令注册                        |
+| `src/core/webview/ClineProvider.ts`                  | Webview 主控制器                        |
+| `src/core/webview/webviewMessageHandler.ts`          | 前端消息分发器                          |
+| `src/core/webview/literatureMessageHandler.ts`       | 文献相关消息处理                        |
+| `src/core/webview/researchPipelineMessageHandler.ts` | 研究流水线消息处理                      |
+| `src/core/webview/paperWritingMessageHandler.ts`     | 论文写作消息处理                        |
+| `src/shared/tools.ts`                                | 工具注册表                              |
+| `src/shared/modes.ts`                                | 内置模式注册（含 Sci-Roo 6 个科研模式） |
+| `packages/types/src/mode.ts`                         | 内置模式定义（DEFAULT_MODES）           |
+| `packages/types/src/research.ts`                     | 科研相关类型定义                        |
+| `webview-ui/src/App.tsx`                             | 前端根组件 + 路由                       |
+| `webview-ui/src/context/ExtensionStateContext.tsx`   | 全局状态                                |
 
 ---
 
-We use [changesets](https://github.com/changesets/changesets) for versioning and publishing. Check our `CHANGELOG.md` for release notes.
+## 配置系统
+
+### 插件清单
+
+| 文件                     | 作用                                                           |
+| ------------------------ | -------------------------------------------------------------- |
+| `src/package.json`       | 扩展清单（name、displayName、commands、menus、keybindings...） |
+| `src/package.nls.json`   | 默认（英文）本地化字符串                                       |
+| `src/package.nls.*.json` | 各语言本地化（zh-CN、ja、de...18 种）                          |
+
+### 内置科研模式
+
+`packages/types/src/mode.ts` 的 `DEFAULT_MODES` 中内置 6 个科研模式，安装插件即用：
+
+| slug                | 模式名                 | 功能                 |
+| ------------------- | ---------------------- | -------------------- |
+| `sci-lit-review`    | 📚 Literature Review   | 文献搜索、评估、综述 |
+| `sci-hyp-design`    | 🔬 Hypothesis & Design | 假设设计、实验方案   |
+| `sci-data-analysis` | 📊 Data Analysis       | 数据分析、统计检验   |
+| `sci-visualization` | 📈 Visualization       | 科学图表生成         |
+| `sci-paper-writing` | ✍️ Paper Writing       | 手稿撰写、格式排版   |
+| `sci-peer-review`   | 🔍 Peer Review         | 同行评审、意见回复   |
+
+### Roo 规则/技能
+
+| 路径                | 作用                                                           |
+| ------------------- | -------------------------------------------------------------- |
+| `.roo/rules/`       | 全局规则（科研伦理、科学严谨性、引用标准、可复现性、隐私保护） |
+| `.roo/rules-sci-*/` | 各科研模式专用规则                                             |
+| `.roo/skills/`      | 技能定义（文献检索、统计检验、图表生成、引用管理、功效分析）   |
 
 ---
 
-## Disclaimer
+## MCP 生态
 
-**Please note** that Roo Code, Inc does **not** make any representations or warranties regarding any code, models, or other tools provided or made available in connection with Roo Code, any associated third-party tools, or any resulting outputs. You assume **all risks** associated with the use of any such tools or outputs; such tools are provided on an **"AS IS"** and **"AS AVAILABLE"** basis. Such risks may include, without limitation, intellectual property infringement, cyber vulnerabilities or attacks, bias, inaccuracies, errors, defects, viruses, downtime, property loss or damage, and/or personal injury. You are solely responsible for your use of any such tools or outputs (including, without limitation, the legality, appropriateness, and results thereof).
-
----
-
-## Contributing
-
-We love community contributions! Get started by reading our [CONTRIBUTING.md](CONTRIBUTING.md).
-
----
-
-## License
-
-[Apache 2.0 © 2025 Roo Code, Inc.](./LICENSE)
+| 服务器   | 文件                           | 说明                       |
+| -------- | ------------------------------ | -------------------------- |
+| PubMed   | `mcp-servers/pubmed/server.py` | NCBI Entrez API，文献搜索  |
+| arXiv    | `mcp-servers/arxiv/server.py`  | arXiv 公共 API，预印本搜索 |
+| Python/R | (MCP 配置)                     | 交互式数据分析内核         |
+| Zotero   | (MCP 配置)                     | 引用管理同步               |
 
 ---
 
-**Enjoy Roo Code!** Whether you keep it on a short leash or let it roam autonomously, we can’t wait to see what you build. If you have questions or feature ideas, drop by our [Reddit community](https://www.reddit.com/r/RooCode/) or [Discord](https://discord.gg/roocode). Happy coding!
+## LLM 提供商
+
+`src/api/providers/` 下支持 30+ 提供商：
+
+Anthropic、OpenAI、OpenAI Codex、OpenAI Compatible、OpenRouter、Gemini、Vertex AI、DeepSeek、Mistral、XAI、Bedrock、LM Studio、Ollama、Fireworks、VS Code LM...
+
+每个 Provider 继承自 `BaseProvider`，提供统一的 `completePrompt()` / `streamResponse()` 接口。
+
+---
+
+## 构建命令
+
+```bash
+# 完整构建
+pnpm build
+
+# 只构建插件
+pnpm --filter @roo-code/types --filter @roo-code/vscode-webview --filter sci-roo build
+
+# 分步构建
+pnpm --filter @roo-code/types build          # 类型定义
+pnpm --filter @roo-code/vscode-webview build # 前端 UI
+pnpm --filter sci-roo bundle                 # 插件后端
+
+# 打包 VSIX
+pnpm vsix
+
+# VS Code 扩展开发主机启动
+code --extensionDevelopmentPath="./src" .
+```
+
+---
+
+## 技术栈
+
+| 层       | 技术                                          |
+| -------- | --------------------------------------------- |
+| 构建     | pnpm workspaces + Turborepo + esbuild + Vite  |
+| 后端     | TypeScript (ES2022)、Node.js 20.19.2          |
+| 前端     | React 18 + Tailwind CSS + Radix UI + Vite     |
+| 类型     | tsup + Zod                                    |
+| AI SDK   | Vercel AI SDK、Anthropic SDK、OpenAI Node SDK |
+| 向量搜索 | Qdrant                                        |
+| 国际化   | i18next（18 种语言）                          |
+| MCP      | @modelcontextprotocol/sdk                     |
