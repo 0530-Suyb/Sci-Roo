@@ -77,6 +77,7 @@ import type { IndexProgressUpdate } from "../../services/code-index/interfaces/m
 import { MdmService } from "../../services/mdm/MdmService"
 import { SkillsManager } from "../../services/skills/SkillsManager"
 import { LiteratureManager } from "../../services/literature/LiteratureManager"
+import { RetrievalManager } from "../../services/literature/RetrievalManager"
 import { DataStudioManager } from "../../services/data-studio/DataStudioManager"
 import { ResearchPipelineManager } from "../../services/research-pipeline/ResearchPipelineManager"
 import { PaperWritingManager } from "../../services/paper-writing/PaperWritingManager"
@@ -147,6 +148,7 @@ export class ClineProvider
 	protected mcpHub?: McpHub // Change from private to protected
 	protected skillsManager?: SkillsManager
 	protected literatureManager?: LiteratureManager
+	protected retrievalManager?: RetrievalManager
 	protected dataStudioManager?: DataStudioManager
 	protected researchPipelineManager?: ResearchPipelineManager
 	protected paperWritingManager?: PaperWritingManager
@@ -243,6 +245,11 @@ export class ClineProvider
 		this.literatureManager = new LiteratureManager(this)
 		this.literatureManager.initialize().catch((error) => {
 			this.log(`Failed to initialize Literature Manager: ${error}`)
+		})
+
+		this.retrievalManager = new RetrievalManager(this)
+		this.retrievalManager.initialize().catch((error) => {
+			this.log(`Failed to initialize ReadPaper Retrieval Manager: ${error}`)
 		})
 
 		this.dataStudioManager = new DataStudioManager(this)
@@ -730,6 +737,8 @@ export class ClineProvider
 		this.skillsManager = undefined
 		await this.literatureManager?.dispose()
 		this.literatureManager = undefined
+		await this.retrievalManager?.dispose()
+		this.retrievalManager = undefined
 		await this.dataStudioManager?.dispose()
 		await this.researchPipelineManager?.dispose()
 		await this.paperWritingManager?.dispose()
@@ -2780,6 +2789,10 @@ export class ClineProvider
 		return this.literatureManager
 	}
 
+	public getRetrievalManager(): RetrievalManager | undefined {
+		return this.retrievalManager
+	}
+
 	public getDataStudioManager(): DataStudioManager | undefined {
 		return this.dataStudioManager
 	}
@@ -3012,7 +3025,9 @@ export class ClineProvider
 		})
 
 		await this.addClineToStack(task)
-		task.start()
+		if (options.startTask ?? true) {
+			task.start()
+		}
 
 		this.log(
 			`[createTask] ${task.parentTask ? "child" : "parent"} task ${task.taskId}.${task.instanceId} instantiated`,

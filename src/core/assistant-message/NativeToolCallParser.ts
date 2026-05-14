@@ -324,6 +324,67 @@ export class NativeToolCallParser {
 		return undefined
 	}
 
+	private static parseNativeArguments(argumentsText: string, toolName: string): Record<string, any> {
+		if (argumentsText === "") return {}
+
+		try {
+			return JSON.parse(argumentsText)
+		} catch (error) {
+			if (toolName !== "search_literature") {
+				throw error
+			}
+
+			const firstObject = this.extractFirstJsonObject(argumentsText)
+			if (!firstObject) {
+				throw error
+			}
+
+			console.warn(
+				`Tool '${toolName}' emitted concatenated JSON arguments. Using the first object and ignoring trailing content.`,
+			)
+			return JSON.parse(firstObject)
+		}
+	}
+
+	private static extractFirstJsonObject(input: string): string | undefined {
+		const start = input.search(/\S/)
+		if (start === -1 || input[start] !== "{") return undefined
+
+		let depth = 0
+		let inString = false
+		let escaped = false
+
+		for (let index = start; index < input.length; index++) {
+			const char = input[index]
+
+			if (inString) {
+				if (escaped) {
+					escaped = false
+				} else if (char === "\\") {
+					escaped = true
+				} else if (char === '"') {
+					inString = false
+				}
+				continue
+			}
+
+			if (char === '"') {
+				inString = true
+				continue
+			}
+			if (char === "{") {
+				depth++
+			} else if (char === "}") {
+				depth--
+				if (depth === 0) {
+					return input.slice(start, index + 1)
+				}
+			}
+		}
+
+		return undefined
+	}
+
 	/**
 	 * Convert raw file entries from API (with line_ranges) to FileEntry objects
 	 * (with lineRanges). Handles multiple formats for backward compatibility:
@@ -496,6 +557,18 @@ export class NativeToolCallParser {
 					nativeArgs = {
 						query: partialArgs.query,
 						path: partialArgs.path,
+					}
+				}
+				break
+
+			case "search_literature":
+				if (partialArgs.query !== undefined) {
+					nativeArgs = {
+						query: partialArgs.query,
+						sources: Array.isArray(partialArgs.sources) ? partialArgs.sources : undefined,
+						maxResults: this.coerceOptionalNumber(partialArgs.maxResults),
+						yearFrom: this.coerceOptionalNumber(partialArgs.yearFrom),
+						yearTo: this.coerceOptionalNumber(partialArgs.yearTo),
 					}
 				}
 				break
@@ -698,7 +771,7 @@ export class NativeToolCallParser {
 
 		try {
 			// Parse the arguments JSON string
-			const args = toolCall.arguments === "" ? {} : JSON.parse(toolCall.arguments)
+			const args = this.parseNativeArguments(toolCall.arguments, resolvedName)
 
 			// Build stringified params for display/logging.
 			// Tool execution MUST use nativeArgs (typed) and does not support legacy fallbacks.
@@ -832,6 +905,18 @@ export class NativeToolCallParser {
 						nativeArgs = {
 							query: args.query,
 							path: args.path,
+						} as NativeArgsFor<TName>
+					}
+					break
+
+				case "search_literature":
+					if (args.query !== undefined) {
+						nativeArgs = {
+							query: args.query,
+							sources: Array.isArray(args.sources) ? args.sources : undefined,
+							maxResults: this.coerceOptionalNumber(args.maxResults),
+							yearFrom: this.coerceOptionalNumber(args.yearFrom),
+							yearTo: this.coerceOptionalNumber(args.yearTo),
 						} as NativeArgsFor<TName>
 					}
 					break

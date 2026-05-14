@@ -91,6 +91,11 @@
 				"icon": "$(library)"
 			},
 			{
+				"command": "sci-roo.readPaperButtonClicked",
+				"title": "%command.readPaper.title%",
+				"icon": "$(book)"
+			},
+			{
 				"command": "sci-roo.dataStudioButtonClicked",
 				"title": "%command.dataStudio.title%",
 				"icon": "$(graph-line)"
@@ -249,13 +254,18 @@
 					"when": "view == sci-roo.SidebarProvider"
 				},
 				{
-					"command": "sci-roo.dataStudioButtonClicked",
+					"command": "sci-roo.readPaperButtonClicked",
 					"group": "navigation@4",
 					"when": "view == sci-roo.SidebarProvider"
 				},
 				{
-					"command": "sci-roo.paperWritingButtonClicked",
+					"command": "sci-roo.dataStudioButtonClicked",
 					"group": "navigation@5",
+					"when": "view == sci-roo.SidebarProvider"
+				},
+				{
+					"command": "sci-roo.paperWritingButtonClicked",
+					"group": "navigation@6",
 					"when": "view == sci-roo.SidebarProvider"
 				},
 				{
@@ -301,13 +311,18 @@
 					"when": "activeWebviewPanelId == sci-roo.TabPanelProvider"
 				},
 				{
-					"command": "sci-roo.dataStudioButtonClicked",
+					"command": "sci-roo.readPaperButtonClicked",
 					"group": "navigation@4",
 					"when": "activeWebviewPanelId == sci-roo.TabPanelProvider"
 				},
 				{
-					"command": "sci-roo.paperWritingButtonClicked",
+					"command": "sci-roo.dataStudioButtonClicked",
 					"group": "navigation@5",
+					"when": "activeWebviewPanelId == sci-roo.TabPanelProvider"
+				},
+				{
+					"command": "sci-roo.paperWritingButtonClicked",
+					"group": "navigation@6",
 					"when": "activeWebviewPanelId == sci-roo.TabPanelProvider"
 				},
 				{

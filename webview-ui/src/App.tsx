@@ -21,6 +21,7 @@ import { DeleteMessageDialog, EditMessageDialog } from "./components/chat/Messag
 import ErrorBoundary from "./components/ErrorBoundary"
 import { CloudView } from "./components/cloud/CloudView"
 import LiteratureView from "./components/literature/LiteratureView"
+import ReadPaperView from "./components/read-paper/ReadPaperView"
 import DataStudioView from "./components/data-studio/DataStudioView"
 import ResearchPipelineView from "./components/research/ResearchPipelineView"
 import PaperWritingView from "./components/paper/PaperWritingView"
@@ -35,6 +36,7 @@ type Tab =
 	| "marketplace"
 	| "cloud"
 	| "literature"
+	| "readPaper"
 	| "dataStudio"
 	| "researchPipeline"
 	| "paperWriting"
@@ -64,6 +66,7 @@ const tabsByMessageAction: Partial<Record<NonNullable<ExtensionMessage["action"]
 	marketplaceButtonClicked: "marketplace",
 	cloudButtonClicked: "cloud",
 	literatureButtonClicked: "literature",
+	readPaperButtonClicked: "readPaper",
 	dataStudioButtonClicked: "dataStudio",
 	researchPipelineButtonClicked: "researchPipeline",
 	paperWritingButtonClicked: "paperWriting",
@@ -263,6 +266,7 @@ const App = () => {
 				/>
 			)}
 			{tab === "literature" && <LiteratureView onDone={() => switchTab("chat")} />}
+			{tab === "readPaper" && <ReadPaperView onDone={() => switchTab("chat")} />}
 			{tab === "dataStudio" && <DataStudioView onDone={() => switchTab("chat")} />}
 			{tab === "researchPipeline" && <ResearchPipelineView onDone={() => switchTab("chat")} />}
 			{tab === "paperWriting" && <PaperWritingView onDone={() => switchTab("chat")} />}

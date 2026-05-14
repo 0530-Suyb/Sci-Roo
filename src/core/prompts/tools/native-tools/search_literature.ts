@@ -5,7 +5,7 @@ export default {
 	function: {
 		name: "search_literature",
 		description:
-			"Search for academic papers across PubMed, arXiv, and Semantic Scholar. Use this tool to find scientific literature on a topic, discover recent papers, or gather references for a research project. Returns structured paper metadata including titles, authors, abstracts, and DOIs.",
+			"Search for academic papers across PubMed and arXiv. Use this tool to find scientific literature on a topic, discover recent papers, or gather references for a research project. Returns structured paper metadata including titles, authors, abstracts, and DOIs.",
 		strict: true,
 		parameters: {
 			type: "object",
@@ -19,7 +19,7 @@ export default {
 					type: "array",
 					items: {
 						type: "string",
-						enum: ["pubmed", "arxiv", "semantic-scholar"],
+						enum: ["pubmed", "arxiv"],
 					},
 					description:
 						"Which academic databases to search. Defaults to all available sources if not specified.",

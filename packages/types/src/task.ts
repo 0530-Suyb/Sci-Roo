@@ -94,6 +94,13 @@ export interface CreateTaskOptions {
 	consecutiveMistakeLimit?: number
 	experiments?: Record<string, boolean>
 	initialTodos?: TodoItem[]
+	workspacePath?: string
+	disabledTools?: ToolName[]
+	todoListEnabled?: boolean
+	/** Internal tasks should not block on user-facing asks such as completion approval or API retry prompts. */
+	nonInteractive?: boolean
+	/** Maximum automatic API retries for non-interactive tasks before aborting. */
+	maxAutoRetries?: number
 	/** Initial status for the task's history item (e.g., "active" for child tasks) */
 	initialStatus?: "active" | "delegated" | "completed"
 	/** Whether to start the task loop immediately (default: true).

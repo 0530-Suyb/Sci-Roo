@@ -105,6 +105,7 @@ export interface ExtensionMessage {
 		| "skills"
 		| "literatureState"
 		| "literatureExportResult"
+		| "readPaperRetrievalState"
 		| "dataStudioState"
 		| "researchPipelineState"
 		| "paperWritingState"
@@ -124,6 +125,7 @@ export interface ExtensionMessage {
 		| "marketplaceButtonClicked"
 		| "cloudButtonClicked"
 		| "literatureButtonClicked"
+		| "readPaperButtonClicked"
 		| "dataStudioButtonClicked"
 		| "researchPipelineButtonClicked"
 		| "paperWritingButtonClicked"
@@ -192,6 +194,8 @@ export interface ExtensionMessage {
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	literatureState?: any // For literature library state response
 	literatureExportResult?: { format: string; content: string } // For literature export response
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	readPaperRetrievalState?: any // For ReadPaper retrieval state response
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	dataStudioState?: any // For data studio state response
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -520,6 +524,7 @@ export interface WebviewMessage {
 		| "clearCloudAuthSkipModel"
 		| "cloudButtonClicked"
 		| "literatureButtonClicked"
+		| "readPaperButtonClicked"
 		| "rooCloudSignIn"
 		| "cloudLandingPageSignIn"
 		| "rooCloudSignOut"
@@ -605,6 +610,13 @@ export interface WebviewMessage {
 		| "literatureAdd"
 		| "literatureRemove"
 		| "literatureExport"
+		| "readPaperListRetrievals"
+		| "readPaperCreateRetrieval"
+		| "readPaperUpdateRetrieval"
+		| "readPaperRunRetrieval"
+		| "readPaperUpdateCandidate"
+		| "readPaperConfirmRetrieval"
+		| "readPaperArchiveRetrieval"
 		| "dataStudioRun"
 		| "dataStudioList"
 		| "researchPipelineRun"

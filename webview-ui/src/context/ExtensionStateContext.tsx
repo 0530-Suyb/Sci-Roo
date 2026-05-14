@@ -145,6 +145,7 @@ export interface ExtensionStateContextType extends ExtensionState {
 	setShowWorktreesInHomeScreen: (value: boolean) => void
 	skills?: SkillMetadata[]
 	literatureLibrary?: any
+	readPaperRetrievalState?: any
 	dataStudioState?: any
 	researchPipelineState?: any
 	paperWritingState?: any
@@ -287,6 +288,7 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 	})
 	const [skills, setSkills] = useState<SkillMetadata[]>([])
 	const [literatureLibrary, setLiteratureLibrary] = useState<any>(undefined)
+	const [readPaperRetrievalState, setReadPaperRetrievalState] = useState<any>(undefined)
 	const [dataStudioState, setDataStudioState] = useState<any>(undefined)
 	const [researchPipelineState, setResearchPipelineState] = useState<any>(undefined)
 	const [paperWritingState, setPaperWritingState] = useState<any>(undefined)
@@ -472,6 +474,12 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 					}
 					break
 				}
+				case "readPaperRetrievalState": {
+					if ((message as any).readPaperRetrievalState) {
+						setReadPaperRetrievalState((message as any).readPaperRetrievalState)
+					}
+					break
+				}
 				case "dataStudioState": {
 					if ((message as any).dataStudioState) {
 						setDataStudioState((message as any).dataStudioState)
@@ -639,6 +647,7 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 		setIncludeCurrentCost,
 		skills,
 		literatureLibrary,
+		readPaperRetrievalState,
 		dataStudioState,
 		researchPipelineState,
 		paperWritingState,

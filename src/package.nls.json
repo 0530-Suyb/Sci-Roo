@@ -12,6 +12,7 @@
 	"command.cloud.title": "Cloud",
 	"command.settings.title": "Settings",
 	"command.literature.title": "Literature Library",
+	"command.readPaper.title": "ReadPaper",
 	"command.documentation.title": "Documentation",
 	"command.openInNewTab.title": "Open In New Tab",
 	"command.explainCode.title": "Explain Code",

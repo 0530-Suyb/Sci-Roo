@@ -25,6 +25,7 @@
 	"command.cloud.title": "Cloud",
 	"command.settings.title": "设置",
 	"command.literature.title": "Literature Library",
+	"command.readPaper.title": "ReadPaper",
 	"command.documentation.title": "文档",
 	"configuration.title": "Sci Roo",
 	"commands.allowedCommands.description": "当启用'始终批准执行操作'时可以自动执行的命令",

@@ -1,0 +1,43 @@
+{
+	"schema_version": "1.0",
+	"retrieval_no": "retrieval_0004",
+	"title": "test5",
+	"Q": "看一下近两年特征模理论的进展",
+	"date": "2026-05-14",
+	"state": "未确认",
+	"query": "",
+	"search_keywords": [],
+	"search_sources": ["pubmed", "arxiv"],
+	"max_results": 20,
+	"inclusion_criteria": [],
+	"exclusion_criteria": [],
+	"search_provenance": {
+		"summary": "",
+		"runs": []
+	},
+	"result_summary": {
+		"total_found": 0,
+		"total_saved": 0,
+		"by_source": {
+			"pubmed": 0,
+			"arxiv": 0
+		},
+		"duplicates_removed": 0,
+		"errors": ["retrieval_task_aborted"]
+	},
+	"candidates": [],
+	"run_status": "aborted",
+	"agent_task": {
+		"task_id": "019e260e-9818-708c-8fc9-8039f1c10d83",
+		"status": "aborted",
+		"prompt_hash": "d3c7abfa4447f97a193693d14bd8e44ab06e72c1c998c5b7b5bb7c6f4788fedf",
+		"prompt_summary": "ReadPaper Retrieval Task: retrieval_0004 | Allowed sources: pubmed, arxiv | Max candidates: 20 | Output: strict JSON only, validated with retrievalAgentOutputSchema | Disallowed: Google Scholar, Semantic Scholar, Crossref, broad web search, PDF download, library import",
+		"created_at": "2026-05-14T10:35:51.198Z",
+		"updated_at": "2026-05-14T10:38:12.699Z"
+	},
+	"created_at": "2026-05-14T10:35:49.915Z",
+	"updated_at": "2026-05-14T10:38:12.699Z",
+	"task_id": "019e260e-9818-708c-8fc9-8039f1c10d83",
+	"last_agent_run_at": "2026-05-14T10:35:51.168Z",
+	"last_error_at": "2026-05-14T10:38:12.683Z"
+}

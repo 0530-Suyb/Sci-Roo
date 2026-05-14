@@ -25,6 +25,7 @@
 	"command.cloud.title": "Cloud",
 	"command.settings.title": "Configuració",
 	"command.literature.title": "Literature Library",
+	"command.readPaper.title": "ReadPaper",
 	"command.documentation.title": "Documentació",
 	"configuration.title": "Sci Roo",
 	"commands.allowedCommands.description": "Ordres que es poden executar automàticament quan 'Aprova sempre les operacions d'execució' està activat",
