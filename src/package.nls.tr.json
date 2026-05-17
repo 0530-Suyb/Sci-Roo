@@ -25,6 +25,7 @@
 	"command.cloud.title": "Cloud",
 	"command.settings.title": "Ayarlar",
 	"command.literature.title": "Literature Library",
+	"command.readPaper.title": "ReadPaper",
 	"command.documentation.title": "Dokümantasyon",
 	"configuration.title": "Sci Roo",
 	"commands.allowedCommands.description": "'Her zaman yürütme işlemlerini onayla' etkinleştirildiğinde otomatik olarak yürütülebilen komutlar",

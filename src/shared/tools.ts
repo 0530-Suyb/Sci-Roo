@@ -51,6 +51,10 @@ export const toolParamNames = [
 	"task",
 	"size",
 	"query",
+	"sources",
+	"maxResults",
+	"yearFrom",
+	"yearTo",
 	"args",
 	"skill", // skill tool parameter
 	"start_line",

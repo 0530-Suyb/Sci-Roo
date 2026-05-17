@@ -138,6 +138,12 @@ const DEFAULT_USAGE_COLLECTION_TIMEOUT_MS = 5000 // 5 seconds
 const FORCED_CONTEXT_REDUCTION_PERCENT = 75 // Keep 75% of context (remove 25%) on context window errors
 const MAX_CONTEXT_WINDOW_RETRIES = 3 // Maximum retries for context window errors
 
+function mergeDisabledTools(stateDisabledTools?: ToolName[], taskDisabledTools?: ToolName[]): ToolName[] | undefined {
+	if (!stateDisabledTools?.length) return taskDisabledTools
+	if (!taskDisabledTools?.length) return stateDisabledTools
+	return [...new Set([...stateDisabledTools, ...taskDisabledTools])]
+}
+
 export interface TaskOptions extends CreateTaskOptions {
 	provider: ClineProvider
 	apiConfiguration: ProviderSettings
@@ -155,6 +161,8 @@ export interface TaskOptions extends CreateTaskOptions {
 	onCreated?: (task: Task) => void
 	initialTodos?: TodoItem[]
 	workspacePath?: string
+	disabledTools?: ToolName[]
+	todoListEnabled?: boolean
 	/** Initial status for the task's history item (e.g., "active" for child tasks) */
 	initialStatus?: "active" | "delegated" | "completed"
 }
@@ -285,6 +293,10 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	api: ApiHandler
 	private static lastGlobalApiRequestTime?: number
 	private autoApprovalHandler: AutoApprovalHandler
+	private readonly taskDisabledTools?: ToolName[]
+	private readonly taskTodoListEnabled?: boolean
+	private readonly taskNonInteractive: boolean
+	private readonly taskMaxAutoRetries: number
 
 	/**
 	 * Reset the global API request timestamp. This should only be used for testing.
@@ -435,6 +447,10 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		onCreated,
 		initialTodos,
 		workspacePath,
+		disabledTools,
+		todoListEnabled,
+		nonInteractive,
+		maxAutoRetries,
 		initialStatus,
 	}: TaskOptions) {
 		super()
@@ -486,6 +502,10 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		this.apiConfiguration = apiConfiguration
 		this.api = buildApiHandler(this.apiConfiguration)
 		this.autoApprovalHandler = new AutoApprovalHandler()
+		this.taskDisabledTools = disabledTools
+		this.taskTodoListEnabled = todoListEnabled
+		this.taskNonInteractive = nonInteractive ?? false
+		this.taskMaxAutoRetries = Math.max(0, Math.floor(maxAutoRetries ?? 1))
 
 		this.consecutiveMistakeLimit = consecutiveMistakeLimit ?? DEFAULT_CONSECUTIVE_MISTAKE_LIMIT
 		this.providerRef = new WeakRef(provider)
@@ -1360,6 +1380,15 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 
 		let timeouts: NodeJS.Timeout[] = []
 
+		const nonInteractiveResponse = this.getNonInteractiveAskResponse(type)
+		if (nonInteractiveResponse) {
+			this.handleWebviewAskResponse(
+				nonInteractiveResponse.response,
+				nonInteractiveResponse.text,
+				nonInteractiveResponse.images,
+			)
+		}
+
 		// Automatically approve if the ask according to the user's settings.
 		const provider = this.providerRef.deref()
 		const state = provider ? await provider.getState() : undefined
@@ -1496,6 +1525,34 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 
 		this.emit(RooCodeEventName.TaskAskResponded)
 		return result
+	}
+
+	private getNonInteractiveAskResponse(
+		type: ClineAsk,
+	): { response: ClineAskResponse; text?: string; images?: string[] } | undefined {
+		if (!this.taskNonInteractive) {
+			return undefined
+		}
+
+		if (type === "completion_result") {
+			return { response: "yesButtonClicked" }
+		}
+
+		if (type === "api_req_failed" || type === "mistake_limit_reached" || type === "auto_approval_max_req_reached") {
+			return { response: "noButtonClicked" }
+		}
+
+		return undefined
+	}
+
+	private shouldRetryNonInteractive(retryAttempt: number): boolean {
+		return this.taskNonInteractive && retryAttempt < this.taskMaxAutoRetries
+	}
+
+	private async abortNonInteractiveTask(message: string): Promise<void> {
+		await this.say("error", message, undefined, false, undefined, undefined, { isNonInteractive: true })
+		this.abortReason = "user_cancelled"
+		await this.abortTask()
 	}
 
 	handleWebviewAskResponse(askResponse: ClineAskResponse, text?: string, images?: string[]) {
@@ -1671,7 +1728,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 				customModes: state?.customModes,
 				experiments: state?.experiments,
 				apiConfiguration,
-				disabledTools: state?.disabledTools,
+				disabledTools: mergeDisabledTools(state?.disabledTools, this.taskDisabledTools),
 				modelInfo,
 				includeAllToolsWithRestrictions: false,
 			})
@@ -3269,9 +3326,15 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 							)
 
 							// Apply exponential backoff similar to first-chunk errors when auto-resubmit is enabled
+							const retryAttempt = currentItem.retryAttempt ?? 0
+							if (this.taskNonInteractive && !this.shouldRetryNonInteractive(retryAttempt)) {
+								await this.abortNonInteractiveTask(streamingFailedMessage ?? rawErrorMessage)
+								break
+							}
+
 							const stateForBackoff = await this.providerRef.deref()?.getState()
-							if (stateForBackoff?.autoApprovalEnabled) {
-								await this.backoffAndAnnounce(currentItem.retryAttempt ?? 0, error)
+							if (stateForBackoff?.autoApprovalEnabled || this.taskNonInteractive) {
+								await this.backoffAndAnnounce(retryAttempt, error)
 
 								// Check if task was aborted during the backoff
 								if (this.abort) {
@@ -3289,7 +3352,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 							stack.push({
 								userContent: currentUserContent,
 								includeFileDetails: false,
-								retryAttempt: (currentItem.retryAttempt ?? 0) + 1,
+								retryAttempt: retryAttempt + 1,
 							})
 
 							// Continue to retry the request
@@ -3654,12 +3717,12 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 						}
 					}
 
-					// Check if we should auto-retry or prompt the user
-					// Reuse the state variable from above
-					if (state?.autoApprovalEnabled) {
+					// Check if we should auto-retry or prompt the user.
+					const retryAttempt = currentItem.retryAttempt ?? 0
+					if (state?.autoApprovalEnabled || this.shouldRetryNonInteractive(retryAttempt)) {
 						// Auto-retry with backoff - don't persist failure message when retrying
 						await this.backoffAndAnnounce(
-							currentItem.retryAttempt ?? 0,
+							retryAttempt,
 							new Error(
 								"Unexpected API Response: The language model did not provide any assistant messages. This may indicate an issue with the API or the model's output.",
 							),
@@ -3678,12 +3741,17 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 						stack.push({
 							userContent: currentUserContent,
 							includeFileDetails: false,
-							retryAttempt: (currentItem.retryAttempt ?? 0) + 1,
+							retryAttempt: retryAttempt + 1,
 							userMessageWasRemoved: true,
 						})
 
 						// Continue to retry the request
 						continue
+					} else if (this.taskNonInteractive) {
+						await this.abortNonInteractiveTask(
+							"Unexpected API Response: The language model did not provide any assistant messages. This may indicate an issue with the API or the model's output.",
+						)
+						return true
 					} else {
 						// Prompt the user for retry decision
 						const { response } = await this.ask(
@@ -3802,7 +3870,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 				language,
 				rooIgnoreInstructions,
 				{
-					todoListEnabled: apiConfiguration?.todoListEnabled ?? true,
+					todoListEnabled: this.taskTodoListEnabled ?? apiConfiguration?.todoListEnabled ?? true,
 					useAgentRules:
 						vscode.workspace.getConfiguration(Package.name).get<boolean>("useAgentRules") ?? true,
 					enableSubfolderRules: enableSubfolderRules ?? false,
@@ -3863,7 +3931,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 				customModes: state?.customModes,
 				experiments: state?.experiments,
 				apiConfiguration,
-				disabledTools: state?.disabledTools,
+				disabledTools: mergeDisabledTools(state?.disabledTools, this.taskDisabledTools),
 				modelInfo,
 				includeAllToolsWithRestrictions: false,
 			})
@@ -4077,7 +4145,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 						customModes: state?.customModes,
 						experiments: state?.experiments,
 						apiConfiguration,
-						disabledTools: state?.disabledTools,
+						disabledTools: mergeDisabledTools(state?.disabledTools, this.taskDisabledTools),
 						modelInfo,
 						includeAllToolsWithRestrictions: false,
 					})
@@ -4241,7 +4309,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 				customModes: state?.customModes,
 				experiments: state?.experiments,
 				apiConfiguration,
-				disabledTools: state?.disabledTools,
+				disabledTools: mergeDisabledTools(state?.disabledTools, this.taskDisabledTools),
 				modelInfo,
 				includeAllToolsWithRestrictions: supportsAllowedFunctionNames,
 			})
@@ -4326,7 +4394,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			}
 
 			// note that this api_req_failed ask is unique in that we only present this option if the api hasn't streamed any content yet (ie it fails on the first chunk due), as it would allow them to hit a retry button. However if the api failed mid-stream, it could be in any arbitrary state where some tools may have executed, so that error is handled differently and requires cancelling the task entirely.
-			if (autoApprovalEnabled) {
+			if (autoApprovalEnabled || this.shouldRetryNonInteractive(retryAttempt)) {
 				// Apply shared exponential backoff and countdown UX
 				await this.backoffAndAnnounce(retryAttempt, error)
 
@@ -4344,6 +4412,9 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 				yield* this.attemptApiRequest(retryAttempt + 1)
 
 				return
+			} else if (this.taskNonInteractive) {
+				await this.abortNonInteractiveTask(error.message ?? JSON.stringify(serializeError(error), null, 2))
+				throw new Error("Non-interactive API request failed")
 			} else {
 				const { response } = await this.ask(
 					"api_req_failed",

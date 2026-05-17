@@ -47,6 +47,15 @@ import {
 	handleLiteratureRemove,
 	handleLiteratureExport,
 } from "./literatureMessageHandler"
+import {
+	handleReadPaperArchiveRetrieval,
+	handleReadPaperConfirmRetrieval,
+	handleReadPaperCreateRetrieval,
+	handleReadPaperListRetrievals,
+	handleReadPaperRunRetrieval,
+	handleReadPaperUpdateCandidate,
+	handleReadPaperUpdateRetrieval,
+} from "./readPaperMessageHandler"
 import { handleDataStudioRun, handleDataStudioList } from "./dataStudioMessageHandler"
 import { handleResearchPipelineRun, handleResearchPipelineList } from "./researchPipelineMessageHandler"
 import { handlePaperWritingAction, handlePaperWritingList } from "./paperWritingMessageHandler"
@@ -3086,6 +3095,34 @@ export const webviewMessageHandler = async (
 		}
 		case "literatureExport": {
 			await handleLiteratureExport(provider, message)
+			break
+		}
+		case "readPaperListRetrievals": {
+			await handleReadPaperListRetrievals(provider, message)
+			break
+		}
+		case "readPaperCreateRetrieval": {
+			await handleReadPaperCreateRetrieval(provider, message)
+			break
+		}
+		case "readPaperUpdateRetrieval": {
+			await handleReadPaperUpdateRetrieval(provider, message)
+			break
+		}
+		case "readPaperRunRetrieval": {
+			await handleReadPaperRunRetrieval(provider, message)
+			break
+		}
+		case "readPaperUpdateCandidate": {
+			await handleReadPaperUpdateCandidate(provider, message)
+			break
+		}
+		case "readPaperConfirmRetrieval": {
+			await handleReadPaperConfirmRetrieval(provider, message)
+			break
+		}
+		case "readPaperArchiveRetrieval": {
+			await handleReadPaperArchiveRetrieval(provider, message)
 			break
 		}
 		case "dataStudioRun": {
