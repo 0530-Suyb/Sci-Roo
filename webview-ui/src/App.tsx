@@ -10,7 +10,7 @@ import { MarketplaceViewStateManager } from "./components/marketplace/Marketplac
 import { vscode } from "./utils/vscode"
 import { telemetryClient } from "./utils/TelemetryClient"
 import { initializeSourceMaps, exposeSourceMapsForDebugging } from "./utils/sourceMapInitializer"
-import { ExtensionStateContextProvider, useExtensionState } from "./context/ExtensionStateContext"
+import { ExtensionStateContextProvider, useExtensionState } from "@/context/ExtensionStateContext"
 import ChatView, { ChatViewRef } from "./components/chat/ChatView"
 import HistoryView from "./components/history/HistoryView"
 import SettingsView, { SettingsViewRef } from "./components/settings/SettingsView"
@@ -341,16 +341,24 @@ const App = () => {
 
 const queryClient = new QueryClient()
 
+const AppRuntimeProviders = () => {
+	const { language } = useExtensionState()
+
+	return (
+		<TranslationProvider language={language}>
+			<QueryClientProvider client={queryClient}>
+				<TooltipProvider delayDuration={STANDARD_TOOLTIP_DELAY}>
+					<App />
+				</TooltipProvider>
+			</QueryClientProvider>
+		</TranslationProvider>
+	)
+}
+
 const AppWithProviders = () => (
 	<ErrorBoundary>
 		<ExtensionStateContextProvider>
-			<TranslationProvider>
-				<QueryClientProvider client={queryClient}>
-					<TooltipProvider delayDuration={STANDARD_TOOLTIP_DELAY}>
-						<App />
-					</TooltipProvider>
-				</QueryClientProvider>
-			</TranslationProvider>
+			<AppRuntimeProviders />
 		</ExtensionStateContextProvider>
 	</ErrorBoundary>
 )

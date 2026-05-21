@@ -14,6 +14,7 @@ import {
 	marketplaceItemSchema,
 } from "./marketplace.js"
 import type { TodoItem } from "./todo.js"
+import type { ReadPaperRetrievalState, ReadPaperWorkspaceConfig } from "./readpaper.js"
 import type { CloudUserInfo, CloudOrganizationMembership, OrganizationAllowList, ShareVisibility } from "./cloud.js"
 import type { SerializedCustomToolDefinition } from "./custom-tool.js"
 import type { GitCommit } from "./git.js"
@@ -106,6 +107,7 @@ export interface ExtensionMessage {
 		| "literatureState"
 		| "literatureExportResult"
 		| "readPaperRetrievalState"
+		| "readPaperWorkspaceConfig"
 		| "dataStudioState"
 		| "researchPipelineState"
 		| "paperWritingState"
@@ -194,8 +196,8 @@ export interface ExtensionMessage {
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	literatureState?: any // For literature library state response
 	literatureExportResult?: { format: string; content: string } // For literature export response
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	readPaperRetrievalState?: any // For ReadPaper retrieval state response
+	readPaperRetrievalState?: ReadPaperRetrievalState // For ReadPaper retrieval state response
+	readPaperWorkspaceConfig?: ReadPaperWorkspaceConfig // For ReadPaper workspace config response
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	dataStudioState?: any // For data studio state response
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -623,6 +625,13 @@ export interface WebviewMessage {
 		| "researchPipelineList"
 		| "paperWritingAction"
 		| "paperWritingList"
+		| "readPaperGetWorkspaceConfig"
+		| "readPaperUpdateWorkspaceConfig"
+		| "readPaperResetWorkspaceConfig"
+		| "readPaperDeleteRetrieval"
+		| "readPaperDeleteRetrievalWithImportedEntries"
+		| "readPaperImportCandidate"
+		| "readPaperImportRetrieval"
 	action?: string
 	text?: string
 	taskId?: string

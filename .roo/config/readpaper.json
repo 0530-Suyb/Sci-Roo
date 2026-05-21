@@ -1,0 +1,12 @@
+{
+	"schema_version": "1.0",
+	"planner_profile_id": "",
+	"planner_profile_name": "",
+	"execution_mode": "lightweight_job",
+	"default_retrieval_strategy": "scholarly_only",
+	"default_sources": ["pubmed", "arxiv", "semantic-scholar", "crossref", "openalex", "dblp", "ieee-xplore", "acm-dl"],
+	"default_max_results": 20,
+	"default_year_from": null,
+	"default_year_to": null,
+	"default_import_target": "literature_library"
+}

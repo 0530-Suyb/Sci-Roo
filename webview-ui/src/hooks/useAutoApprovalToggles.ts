@@ -1,5 +1,5 @@
 import { useMemo } from "react"
-import { useExtensionState } from "@src/context/ExtensionStateContext"
+import { useExtensionState } from "@/context/ExtensionStateContext"
 
 /**
  * Custom hook that creates and returns the auto-approval toggles object

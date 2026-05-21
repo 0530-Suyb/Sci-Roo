@@ -19,8 +19,6 @@
 	],
 	"search_sources": ["pubmed", "arxiv"],
 	"max_results": 20,
-	"inclusion_criteria": [],
-	"exclusion_criteria": [],
 	"search_provenance": {
 		"summary": "Assumed the Chinese request referred to the electromagnetic antenna-domain Theory of Characteristic Modes and searched PubMed and arXiv for the last two years available in the retrieval window 2024-2026. PubMed returned 10 records, many likely off-topic because the acronym TCM is ambiguous. arXiv failed with HTTP 429 rate limiting.",
 		"runs": [

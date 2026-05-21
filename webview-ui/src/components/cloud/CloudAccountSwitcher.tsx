@@ -3,7 +3,7 @@ import { Building2, Plus } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectSeparator } from "@/components/ui/select"
 import { useAppTranslation } from "@src/i18n/TranslationContext"
 import { vscode } from "@src/utils/vscode"
-import { useExtensionState } from "@src/context/ExtensionStateContext"
+import { useExtensionState } from "@/context/ExtensionStateContext"
 import { cn } from "@src/lib/utils"
 
 export const CloudAccountSwitcher = () => {
