@@ -1,278 +1,238 @@
-import React, { useState, useCallback, useEffect } from "react"
-import { ArrowLeft, FileText, Plus, Download, Save, BookOpen, BarChart3, Table2 } from "lucide-react"
-import { useAppTranslation } from "@/i18n/TranslationContext"
+import React, { useCallback, useEffect, useState } from "react"
+import { ArrowLeft, FileText, Loader2 } from "lucide-react"
 import { useExtensionState } from "@/context/ExtensionStateContext"
-import { Tab, TabContent, TabHeader } from "../common/Tab"
-import { Button, Input } from "@/components/ui"
+import { Button } from "@/components/ui"
 import { vscode } from "@/utils/vscode"
+import { ProjectCreateForm } from "./ProjectCreateForm"
+import { SectionList } from "./SectionList"
+import { SectionEditor } from "./SectionEditor"
+import { ReferencePanel } from "./ReferencePanel"
 
 type PaperWritingViewProps = {
 	onDone: () => void
 }
 
-const SECTION_TYPES = [
-	{ type: "abstract", label: "Abstract" },
-	{ type: "introduction", label: "Introduction" },
-	{ type: "methods", label: "Methods" },
-	{ type: "results", label: "Results" },
-	{ type: "discussion", label: "Discussion" },
-	{ type: "conclusion", label: "Conclusion" },
-	{ type: "references", label: "References" },
-]
-
 const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone }) => {
-	const { t: _t } = useAppTranslation()
-	const { paperWritingState } = useExtensionState()
-	const state = paperWritingState || {}
+	const { paperProjectState, paperWritingState, paperReferenceState, paperSnapshotState } = useExtensionState()
 
-	const manuscript = state.current
+	const [loading, setLoading] = useState(true)
 
-	const [showCreate, setShowCreate] = useState(false)
-	const [newTitle, setNewTitle] = useState("")
+	const project = paperProjectState?.project ?? null
+	const writingState = paperProjectState?.writingState ?? paperWritingState?.writingState ?? null
+	const wordStatus = paperWritingState?.wordStatus ?? null
+	const referenceEntries = paperReferenceState?.entries ?? paperProjectState?.referenceEntries ?? []
+	const uncatalogued = paperReferenceState?.uncatalogued ?? paperProjectState?.uncatalogued ?? []
+	const cited = paperReferenceState?.cited ?? null
+	const missing = paperReferenceState?.missing ?? null
+	const bibGenerated = paperReferenceState?.bibGenerated ?? false
+	const bibPreview = paperReferenceState?.bibPreview ?? null
+	const snapshots = paperSnapshotState?.snapshots ?? []
+	const venueSwitchPreview = paperProjectState?.venueSwitchPreview ?? null
+
+	// Current section being edited
 	const [selectedSection, setSelectedSection] = useState<string | null>(null)
-	const [sectionTitle, setSectionTitle] = useState("")
 	const [sectionContent, setSectionContent] = useState("")
+	const [showCreate, setShowCreate] = useState(false)
+	const [pendingCreate, setPendingCreate] = useState(false)
+	const [refreshing, setRefreshing] = useState(false)
 
-	const handleRequestList = useCallback(() => {
-		vscode.postMessage({ type: "paperWritingList" })
-	}, [])
-
+	// Load project on mount
 	useEffect(() => {
-		handleRequestList()
-	}, [handleRequestList])
-
-	const handleCreateManuscript = useCallback(() => {
-		if (!newTitle.trim()) return
-		vscode.postMessage({
-			type: "paperWritingAction",
-			action: "createManuscript",
-			query: newTitle,
-		})
-		setShowCreate(false)
-		setNewTitle("")
-	}, [newTitle])
-
-	const handleSelectSection = useCallback((section: any) => {
-		setSelectedSection(section.type)
-		setSectionTitle(section.title || section.type)
-		setSectionContent(section.content || "")
+		vscode.postMessage({ type: "paperProjectLoad" })
+		const timer = setTimeout(() => setLoading(false), 1500)
+		return () => clearTimeout(timer)
 	}, [])
 
-	const handleSaveSection = useCallback(() => {
-		if (!selectedSection || !sectionContent.trim()) return
-		vscode.postMessage({
-			type: "paperWritingAction",
-			action: "updateSection",
-			text: sectionContent,
-			sectionType: selectedSection,
-			sectionTitle: sectionTitle || selectedSection,
-		} as any)
-	}, [selectedSection, sectionTitle, sectionContent])
+	// When paperProjectState arrives, stop loading
+	useEffect(() => {
+		if (paperProjectState) {
+			setLoading(false)
+		}
+	}, [paperProjectState])
 
-	const handleExport = useCallback((format: "markdown" | "latex") => {
+	// When section content arrives from backend, update editor
+	useEffect(() => {
+		if (paperWritingState?.sectionContent !== undefined) {
+			setSectionContent(paperWritingState.sectionContent)
+		}
+		if (paperWritingState?.sectionType) {
+			setSelectedSection(paperWritingState.sectionType)
+		}
+	}, [paperWritingState])
+
+	// When project arrives after pending create, close the form
+	useEffect(() => {
+		if (pendingCreate && project) {
+			setShowCreate(false)
+			setPendingCreate(false)
+		}
+	}, [pendingCreate, project])
+
+	const handleSelectSection = useCallback((sectionType: string) => {
+		setSelectedSection(sectionType)
 		vscode.postMessage({
-			type: "paperWritingAction",
-			action: "exportManuscript",
-			query: format,
+			type: "paperSectionLoad",
+			action: "sectionLoad",
+			sectionType,
 		})
 	}, [])
 
-	const handleNewSection = useCallback(
-		(sectionType: string) => {
-			const existing = manuscript?.sections?.find((s: any) => s.type === sectionType)
-			if (existing) {
-				handleSelectSection(existing)
-			} else {
-				setSelectedSection(sectionType)
-				setSectionTitle(sectionType.charAt(0).toUpperCase() + sectionType.slice(1))
-				setSectionContent("")
-			}
-		},
-		[manuscript, handleSelectSection],
-	)
+	const handleSaveSection = useCallback((sectionType: string, content: string) => {
+		vscode.postMessage({
+			type: "paperSectionSave",
+			action: "sectionSave",
+			text: content,
+			sectionType,
+		})
+	}, [])
 
-	return (
-		<Tab>
-			<TabHeader>
-				<div className="flex items-center gap-2">
+	const handleRefreshProject = useCallback(() => {
+		setRefreshing(true)
+		vscode.postMessage({
+			type: "paperProjectCreate",
+			action: "projectRefresh",
+		})
+		setTimeout(() => setRefreshing(false), 3000)
+	}, [])
+
+	// ── Section CRUD (Phase 6) ──
+
+	const handleAddSection = useCallback((sectionType: string, label: string) => {
+		vscode.postMessage({
+			type: "paperProjectCreate",
+			action: "sectionAdd",
+			sectionType,
+			sectionLabel: label,
+		})
+	}, [])
+
+	const handleDeleteSection = useCallback((sectionType: string) => {
+		vscode.postMessage({
+			type: "paperProjectCreate",
+			action: "sectionDelete",
+			sectionType,
+		})
+	}, [])
+
+	const handleRenameSection = useCallback((sectionType: string, newLabel: string) => {
+		vscode.postMessage({
+			type: "paperProjectCreate",
+			action: "sectionRename",
+			sectionType,
+			sectionLabel: newLabel,
+		})
+	}, [])
+
+	if (loading && !paperProjectState) {
+		return (
+			<div className="flex flex-col h-full">
+				<div className="flex items-center gap-2 px-4 py-3 border-b">
 					<Button variant="ghost" size="icon" onClick={onDone}>
 						<ArrowLeft className="w-4 h-4" />
 					</Button>
 					<FileText className="w-5 h-5" />
 					<h3 className="text-lg font-semibold">Paper Writing</h3>
 				</div>
+				<div className="flex-1 flex items-center justify-center">
+					<div className="flex items-center gap-2 text-muted-foreground">
+						<Loader2 className="w-4 h-4 animate-spin" />
+						<span className="text-sm">Loading project...</span>
+					</div>
+				</div>
+			</div>
+		)
+	}
+
+	return (
+		<div className="flex flex-col h-full">
+			{/* Header */}
+			<div className="flex items-center gap-2 px-4 py-3 border-b shrink-0">
+				<Button variant="ghost" size="icon" onClick={onDone}>
+					<ArrowLeft className="w-4 h-4" />
+				</Button>
+				<FileText className="w-5 h-5" />
+				<h3 className="text-lg font-semibold">Paper Writing</h3>
+				{project && (
+					<>
+						<span className="text-xs text-muted-foreground px-2 py-0.5 rounded bg-secondary">
+							{project.templateId}
+						</span>
+						<span className="text-xs text-muted-foreground">Stage: {project.stage}</span>
+					</>
+				)}
 				<div className="flex items-center gap-2 ml-auto">
-					{manuscript && (
+					{project && (
+						<Button variant="outline" size="sm" onClick={handleRefreshProject}>
+							Refresh
+						</Button>
+					)}
+					{!project && (
+						<Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
+							New Project
+						</Button>
+					)}
+				</div>
+			</div>
+
+			{/* Body */}
+			{!project || showCreate || pendingCreate ? (
+				<div className="flex-1 overflow-auto">
+					<ProjectCreateForm
+						onCreated={() => {
+							setShowCreate(false)
+						}}
+						onCancel={project ? () => setShowCreate(false) : undefined}
+					/>
+				</div>
+			) : (
+				<div className="flex-1 flex min-h-0">
+					{/* Left: Section List */}
+					<SectionList
+						project={project}
+						writingState={writingState}
+						wordStatus={wordStatus}
+						selectedSection={selectedSection}
+						onSelectSection={handleSelectSection}
+					/>
+
+					{/* Center: Section Editor */}
+					<SectionEditor
+						project={project}
+						selectedSection={selectedSection}
+						sectionContent={sectionContent}
+						onContentChange={setSectionContent}
+						onSave={handleSaveSection}
+						snapshots={snapshots}
+						paperWritingState={paperWritingState}
+					/>
+
+					{/* Right: Reference Panel */}
+					<ReferencePanel
+						referenceEntries={referenceEntries}
+						uncatalogued={uncatalogued}
+						cited={cited}
+						missing={missing}
+						bibGenerated={bibGenerated}
+						bibPreview={bibPreview}
+					/>
+				</div>
+			)}
+
+			{/* Footer */}
+			{project && (
+				<div className="px-4 py-1.5 border-t text-xs text-muted-foreground flex items-center gap-4 shrink-0">
+					<span>Stage: {project.stage}</span>
+					{writingState && (
 						<>
-							<Button variant="outline" size="sm" onClick={() => handleExport("markdown")}>
-								<Download className="w-3 h-3 mr-1" />
-								Markdown
-							</Button>
-							<Button variant="outline" size="sm" onClick={() => handleExport("latex")}>
-								<Download className="w-3 h-3 mr-1" />
-								LaTeX
-							</Button>
+							<span>
+								Words: {writingState.totalWords}/{writingState.targetWords}
+							</span>
+							<span>Citations: {writingState.citationCount}</span>
 						</>
 					)}
-					<Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
-						<Plus className="w-4 h-4" />
-						<span className="ml-1">New</span>
-					</Button>
 				</div>
-			</TabHeader>
-
-			<TabContent>
-				<div className="flex h-full">
-					{/* Sidebar - section list */}
-					<div className="w-52 border-r shrink-0 overflow-auto p-2">
-						{manuscript ? (
-							<>
-								<div className="px-2 py-1 mb-2">
-									<h4 className="font-semibold text-sm leading-snug">{manuscript.title}</h4>
-									<span className="text-[10px] px-1.5 py-0.5 rounded bg-secondary text-secondary-foreground mt-1 inline-block">
-										{manuscript.status}
-									</span>
-								</div>
-								{SECTION_TYPES.map(({ type, label }) => {
-									const section = manuscript.sections?.find((s: any) => s.type === type)
-									return (
-										<button
-											key={type}
-											onClick={() =>
-												section ? handleSelectSection(section) : handleNewSection(type)
-											}
-											className={`w-full text-left px-2 py-1.5 rounded text-xs mb-0.5 transition-colors ${
-												selectedSection === type
-													? "bg-primary/10 text-primary font-medium"
-													: "hover:bg-muted/50 text-muted-foreground"
-											}`}>
-											<div className="flex items-center justify-between">
-												<span>{label}</span>
-												{section && (
-													<span className="text-[10px] text-muted-foreground">
-														{section.wordCount}w
-													</span>
-												)}
-											</div>
-											{section && (
-												<div className="w-full bg-muted rounded h-1 mt-1">
-													<div
-														className={`h-1 rounded ${section.status === "final" ? "bg-green-500" : section.status === "revised" ? "bg-amber-500" : "bg-blue-500"}`}
-														style={{
-															width:
-																section.status === "final"
-																	? "100%"
-																	: section.status === "revised"
-																		? "60%"
-																		: "30%",
-														}}
-													/>
-												</div>
-											)}
-										</button>
-									)
-								})}
-								<div className="border-t mt-2 pt-2 px-2">
-									<span className="text-[10px] text-muted-foreground">
-										<BookOpen className="w-3 h-3 inline mr-1" />
-										{manuscript.citations?.length || 0} references
-									</span>
-								</div>
-								<div className="px-2 mt-1">
-									<span className="text-[10px] text-muted-foreground">
-										<BarChart3 className="w-3 h-3 inline mr-1" />
-										{manuscript.figures?.length || 0} figures
-									</span>
-								</div>
-								<div className="px-2 mt-1">
-									<span className="text-[10px] text-muted-foreground">
-										<Table2 className="w-3 h-3 inline mr-1" />
-										{manuscript.tables?.length || 0} tables
-									</span>
-								</div>
-							</>
-						) : (
-							<div className="p-2 text-xs text-muted-foreground text-center py-8">
-								<FileText className="w-8 h-8 mx-auto mb-2 opacity-50" />
-								No manuscript yet.
-							</div>
-						)}
-					</div>
-
-					{/* Editor area */}
-					<div className="flex-1 flex flex-col min-w-0">
-						{/* Create manuscript dialog */}
-						{showCreate && (
-							<div className="px-4 py-3 border-b">
-								<div className="space-y-2">
-									<Input
-										placeholder="Manuscript title..."
-										value={newTitle}
-										onChange={(e) => setNewTitle(e.target.value)}
-										onKeyDown={(e) => e.key === "Enter" && handleCreateManuscript()}
-									/>
-									<div className="flex gap-2">
-										<Button variant="primary" size="sm" onClick={handleCreateManuscript}>
-											Create
-										</Button>
-										<Button variant="ghost" size="sm" onClick={() => setShowCreate(false)}>
-											Cancel
-										</Button>
-									</div>
-								</div>
-							</div>
-						)}
-
-						{selectedSection ? (
-							<>
-								{/* Section editor header */}
-								<div className="px-4 py-2 border-b flex items-center justify-between">
-									<Input
-										value={sectionTitle}
-										onChange={(e) => setSectionTitle(e.target.value)}
-										className="text-sm font-medium border-0 p-0 shadow-none bg-transparent"
-										placeholder="Section title..."
-									/>
-									<Button variant="primary" size="sm" onClick={handleSaveSection}>
-										<Save className="w-3 h-3 mr-1" />
-										Save
-									</Button>
-								</div>
-
-								{/* Section content editor */}
-								<div className="p-4 flex-1 min-h-0">
-									<textarea
-										value={sectionContent}
-										onChange={(e) => setSectionContent(e.target.value)}
-										placeholder="Write your section content here..."
-										className="w-full h-full resize-none text-sm p-4 rounded-lg border bg-muted/30 focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans leading-relaxed"
-									/>
-								</div>
-							</>
-						) : (
-							<div className="flex-1 flex items-center justify-center p-8">
-								<div className="text-center text-muted-foreground">
-									<FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
-									{manuscript ? (
-										<>
-											<p>Select a section from the sidebar to start editing.</p>
-											<p className="text-sm mt-1">Or create a new section below.</p>
-										</>
-									) : (
-										<>
-											<p>Create a manuscript to get started.</p>
-											<p className="text-sm mt-1">
-												Write your paper with IMRaD structure and export to LaTeX or Markdown.
-											</p>
-										</>
-									)}
-								</div>
-							</div>
-						)}
-					</div>
-				</div>
-			</TabContent>
-		</Tab>
+			)}
+		</div>
 	)
 }
 

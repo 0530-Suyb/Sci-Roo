@@ -80,7 +80,10 @@ import { LiteratureManager } from "../../services/literature/LiteratureManager"
 import { RetrievalManager } from "../../services/literature/RetrievalManager"
 import { DataStudioManager } from "../../services/data-studio/DataStudioManager"
 import { ResearchPipelineManager } from "../../services/research-pipeline/ResearchPipelineManager"
-import { PaperWritingManager } from "../../services/paper-writing/PaperWritingManager"
+import { PaperProjectManager } from "../../services/paper/PaperProjectManager"
+import { PaperSectionManager } from "../../services/paper/PaperSectionManager"
+import { ReferenceManager } from "../../services/paper/ReferenceManager"
+import { VenueTemplateManager } from "../../services/paper/VenueTemplateManager"
 
 import { fileExistsAtPath } from "../../utils/fs"
 import { setTtsEnabled, setTtsSpeed } from "../../utils/tts"
@@ -151,7 +154,11 @@ export class ClineProvider
 	protected retrievalManager?: RetrievalManager
 	protected dataStudioManager?: DataStudioManager
 	protected researchPipelineManager?: ResearchPipelineManager
-	protected paperWritingManager?: PaperWritingManager
+	// Paper Writing services
+	protected paperProjectManager?: PaperProjectManager
+	protected paperSectionManager?: PaperSectionManager
+	protected referenceManager?: ReferenceManager
+	protected venueTemplateManager?: VenueTemplateManager
 	private marketplaceManager: MarketplaceManager
 	private mdmService?: MdmService
 	private taskCreationCallback: (task: Task) => void
@@ -255,6 +262,20 @@ export class ClineProvider
 		this.dataStudioManager = new DataStudioManager(this)
 		this.dataStudioManager.initialize().catch((error) => {
 			this.log(`Failed to initialize Data Studio Manager: ${error}`)
+		})
+
+		this.researchPipelineManager = new ResearchPipelineManager(this)
+		this.researchPipelineManager.initialize().catch((error) => {
+			this.log(`Failed to initialize Research Pipeline Manager: ${error}`)
+		})
+
+		this.venueTemplateManager = new VenueTemplateManager(this.context.extensionPath)
+		this.paperProjectManager = new PaperProjectManager(this, this.context.extensionPath)
+		this.referenceManager = new ReferenceManager(this)
+		this.paperSectionManager = new PaperSectionManager(this)
+
+		this.paperProjectManager.autoDetect().catch((error) => {
+			this.log(`Failed to auto-detect paper project: ${error}`)
 		})
 
 		this.marketplaceManager = new MarketplaceManager(this.context, this.customModesManager)
@@ -741,7 +762,10 @@ export class ClineProvider
 		this.retrievalManager = undefined
 		await this.dataStudioManager?.dispose()
 		await this.researchPipelineManager?.dispose()
-		await this.paperWritingManager?.dispose()
+		this.paperProjectManager = undefined
+		this.paperSectionManager = undefined
+		this.referenceManager = undefined
+		this.venueTemplateManager = undefined
 		this.dataStudioManager = undefined
 		this.marketplaceManager?.cleanup()
 		this.customModesManager?.dispose()
@@ -2801,8 +2825,20 @@ export class ClineProvider
 		return this.researchPipelineManager
 	}
 
-	public getPaperWritingManager(): PaperWritingManager | undefined {
-		return this.paperWritingManager
+	public getPaperProjectManager(): PaperProjectManager | undefined {
+		return this.paperProjectManager
+	}
+
+	public getPaperSectionManager(): PaperSectionManager | undefined {
+		return this.paperSectionManager
+	}
+
+	public getReferenceManager(): ReferenceManager | undefined {
+		return this.referenceManager
+	}
+
+	public getVenueTemplateManager(): VenueTemplateManager | undefined {
+		return this.venueTemplateManager
 	}
 
 	/**

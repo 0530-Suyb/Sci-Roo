@@ -67,7 +67,7 @@ Sci-Roo/
 | `src/core/checkpoints/`           | 任务检查点/回滚                                                                                                                       |
 | `src/services/literature/`        | 文献管理器（LiteratureManager）                                                                                                       |
 | `src/services/research-pipeline/` | 研究流水线管理器（ResearchPipelineManager）                                                                                           |
-| `src/services/paper-writing/`     | 论文写作管理器（PaperWritingManager）                                                                                                 |
+| `src/services/paper/`             | 论文写作服务（PaperProjectManager, ReferenceManager, PaperSectionManager, VenueTemplateManager）                                      |
 | `src/services/data-studio/`       | 数据工作室管理器（DataStudioManager）                                                                                                 |
 | `src/services/mcp/`               | MCP 协议 Hub（McpHub、McpServerManager）                                                                                              |
 | `src/services/skills/`            | 技能管理器（SkillsManager、skillInvocation）                                                                                          |

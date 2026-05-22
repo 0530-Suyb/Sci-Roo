@@ -149,6 +149,9 @@ export interface ExtensionStateContextType extends ExtensionState {
 	dataStudioState?: any
 	researchPipelineState?: any
 	paperWritingState?: any
+	paperProjectState?: any
+	paperReferenceState?: any
+	paperSnapshotState?: any
 }
 
 export const ExtensionStateContext = createContext<ExtensionStateContextType | undefined>(undefined)
@@ -292,6 +295,9 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 	const [dataStudioState, setDataStudioState] = useState<any>(undefined)
 	const [researchPipelineState, setResearchPipelineState] = useState<any>(undefined)
 	const [paperWritingState, setPaperWritingState] = useState<any>(undefined)
+	const [paperProjectState, setPaperProjectState] = useState<any>(undefined)
+	const [paperReferenceState, setPaperReferenceState] = useState<any>(undefined)
+	const [paperSnapshotState, setPaperSnapshotState] = useState<any>(undefined)
 	const [includeTaskHistoryInEnhance, setIncludeTaskHistoryInEnhance] = useState(true)
 	const [prevCloudIsAuthenticated, setPrevCloudIsAuthenticated] = useState(false)
 	const [includeCurrentTime, setIncludeCurrentTime] = useState(true)
@@ -494,7 +500,37 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 				}
 				case "paperWritingState": {
 					if ((message as any).paperWritingState) {
-						setPaperWritingState((message as any).paperWritingState)
+						setPaperWritingState((prev: any) => ({
+							...(prev ?? {}),
+							...(message as any).paperWritingState,
+						}))
+					}
+					break
+				}
+				case "paperProjectState": {
+					if ((message as any).paperProjectState) {
+						setPaperProjectState((prev: any) => ({
+							...(prev ?? {}),
+							...(message as any).paperProjectState,
+						}))
+					}
+					break
+				}
+				case "paperReferenceState": {
+					if ((message as any).paperReferenceState) {
+						setPaperReferenceState((prev: any) => ({
+							...(prev ?? {}),
+							...(message as any).paperReferenceState,
+						}))
+					}
+					break
+				}
+				case "paperSnapshotState": {
+					if ((message as any).paperSnapshotState) {
+						setPaperSnapshotState((prev: any) => ({
+							...(prev ?? {}),
+							...(message as any).paperSnapshotState,
+						}))
 					}
 					break
 				}
@@ -651,6 +687,9 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 		dataStudioState,
 		researchPipelineState,
 		paperWritingState,
+		paperProjectState,
+		paperReferenceState,
+		paperSnapshotState,
 		showWorktreesInHomeScreen: state.showWorktreesInHomeScreen ?? true,
 		setShowWorktreesInHomeScreen: (value) =>
 			setState((prevState) => ({ ...prevState, showWorktreesInHomeScreen: value })),

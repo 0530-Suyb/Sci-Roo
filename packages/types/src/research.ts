@@ -187,3 +187,112 @@ export interface RevisionPlan {
 	createdAt: string
 	status: "pending" | "in-progress" | "completed"
 }
+
+// ─── Paper Writing v2 (科研工程 + 引用管理 + 模板) ──────────────────────
+
+export type PaperProjectStage = "planning" | "literature-review" | "writing" | "revising" | "final" | "submitted"
+
+export interface PaperProject {
+	id: string
+	name: string
+	description?: string
+	rootPath: string
+	templateId: string
+	templateSource: "builtin" | "custom"
+	directoryTemplate: string
+	stage: PaperProjectStage
+	customSectionConfigs?: Record<SectionType, { label: string; targetWordRange?: [number, number] }>
+	createdAt: string
+	updatedAt: string
+}
+
+export interface DirectoryTemplate {
+	id: string
+	name: string
+	description: string
+	structure: DirectoryNode[]
+	ruleFiles?: string[] // rule filenames to copy to project's .roo/rules-sci-paper-writing/
+}
+
+export interface DirectoryNode {
+	name: string
+	type: "directory" | "file"
+	children?: DirectoryNode[]
+	template?: string
+}
+
+import { Author } from "./literature.js"
+
+export interface ReferenceEntry {
+	citeKey: string
+	title: string
+	authors: Author[]
+	year: number
+	venue: string
+	doi?: string
+	arxivId?: string
+	abstract?: string
+	keywords: string[]
+	bibtex?: string
+	hasPdf: boolean
+	verified: boolean
+	verifiedAt?: string
+	tags: string[]
+	dateAdded: string
+}
+
+export type SectionType =
+	| "abstract"
+	| "introduction"
+	| "related-work"
+	| "methods"
+	| "results"
+	| "discussion"
+	| "conclusion"
+	| "broader-impact"
+	| "limitations"
+	| "appendix"
+
+export interface SectionConfig {
+	type: SectionType
+	label: string
+	recommendedOrder: number
+	required: boolean
+	targetWordRange?: [number, number]
+	aiWritePrompt?: string
+}
+
+export interface VenueTemplate {
+	id: string
+	name: string
+	type: "ml" | "systems" | "general"
+	pageLimit: number
+	extraPages: number
+	citationStyle: string
+	sectionConfigs: SectionConfig[]
+	hasChecklist: boolean
+	hasBroaderImpact: boolean
+	hasLimitations: boolean
+	skillNames?: string[] // skill names to copy to project's .roo/skills/
+}
+
+export interface PaperWritingState {
+	currentSection?: SectionType
+	sectionStatus: Record<SectionType, "outline" | "draft" | "revised" | "final">
+	totalWords: number
+	targetWords: number
+	citationCount: number
+	figureCount: number
+	tableCount: number
+	lastEdited: string
+}
+
+export interface SnapshotMeta {
+	id: string
+	createdAt: string
+	label?: string
+	fileCount: number
+}
+
+export const PAPER_PROJECT_DIR = ".roo"
+export const PAPER_PROJECT_FILENAME = "project.json"

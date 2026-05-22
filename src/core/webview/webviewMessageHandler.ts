@@ -58,7 +58,7 @@ import {
 } from "./readPaperMessageHandler"
 import { handleDataStudioRun, handleDataStudioList } from "./dataStudioMessageHandler"
 import { handleResearchPipelineRun, handleResearchPipelineList } from "./researchPipelineMessageHandler"
-import { handlePaperWritingAction, handlePaperWritingList } from "./paperWritingMessageHandler"
+import { handlePaperWritingAction, handlePaperWritingList, handlePaperWritingAiOp } from "./paperWritingMessageHandler"
 import { changeLanguage, t } from "../../i18n"
 import { Package } from "../../shared/package"
 import { type RouterName, toRouterName } from "../../shared/api"
@@ -3147,6 +3147,38 @@ export const webviewMessageHandler = async (
 		}
 		case "paperWritingList": {
 			await handlePaperWritingList(provider)
+			break
+		}
+		case "paperWritingAiOp": {
+			await handlePaperWritingAiOp(provider, message)
+			break
+		}
+		// Paper Writing v2 — project load/list
+		case "paperProjectList":
+		case "paperProjectLoad": {
+			await handlePaperWritingList(provider)
+			break
+		}
+		// Paper Writing v2 messages — routed through paperWritingAction handler
+		case "paperProjectCreate":
+		case "paperProjectOpen":
+		case "paperSectionLoad":
+		case "paperSectionSave":
+		case "paperSectionStatus":
+		case "paperAiWriteSection":
+		case "paperReferenceList":
+		case "paperReferenceScanTex":
+		case "paperReferenceGenerateBib":
+		case "paperReferenceAdd":
+		case "paperReferenceRemove":
+		case "paperReferenceBatchImport":
+		case "paperReferenceScanPdf":
+		case "paperSnapshotCreate":
+		case "paperSnapshotList":
+		case "paperSnapshotRestore":
+		case "paperVenueSwitch":
+		case "paperMarkdownExport": {
+			await handlePaperWritingAction(provider, message)
 			break
 		}
 		case "openCommandFile": {

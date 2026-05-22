@@ -109,6 +109,9 @@ export interface ExtensionMessage {
 		| "dataStudioState"
 		| "researchPipelineState"
 		| "paperWritingState"
+		| "paperProjectState"
+		| "paperReferenceState"
+		| "paperSnapshotState"
 		| "fileContent"
 	text?: string
 	/** For fileContent: { path, content, error? } */
@@ -202,6 +205,12 @@ export interface ExtensionMessage {
 	researchPipelineState?: any // For research pipeline state response
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	paperWritingState?: any // For paper writing state response
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	paperProjectState?: any // For paper project state response
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	paperReferenceState?: any // For paper reference state response
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	paperSnapshotState?: any // For paper snapshot state response
 	modes?: { slug: string; name: string }[] // For modes response
 	aggregatedCosts?: {
 		// For taskWithAggregatedCosts response
@@ -623,6 +632,27 @@ export interface WebviewMessage {
 		| "researchPipelineList"
 		| "paperWritingAction"
 		| "paperWritingList"
+		| "paperWritingAiOp"
+		| "paperProjectCreate"
+		| "paperProjectOpen"
+		| "paperProjectList"
+		| "paperProjectLoad"
+		| "paperSectionLoad"
+		| "paperSectionSave"
+		| "paperSectionStatus"
+		| "paperAiWriteSection"
+		| "paperReferenceList"
+		| "paperReferenceScanTex"
+		| "paperReferenceGenerateBib"
+		| "paperReferenceAdd"
+		| "paperReferenceRemove"
+		| "paperReferenceBatchImport"
+		| "paperReferenceScanPdf"
+		| "paperSnapshotCreate"
+		| "paperSnapshotList"
+		| "paperSnapshotRestore"
+		| "paperVenueSwitch"
+		| "paperMarkdownExport"
 	action?: string
 	text?: string
 	taskId?: string
@@ -658,6 +688,17 @@ export interface WebviewMessage {
 	format?: string
 	setting?: string
 	slug?: string
+	sectionType?: string
+	sectionLabel?: string
+	description?: string
+	customStructure?: any // Paper writing: section type identifier
+	directoryTemplate?: string // Paper writing: directory template ID
+	venueTemplateId?: string // Paper writing: venue template ID
+	operation?: string // Paper writing: AI operation name
+	option?: string // Paper writing: AI operation option
+	entry?: any // Paper writing: reference entry data
+	newTemplateId?: string // Paper writing: new venue template ID for switching
+	bibtexContent?: string // Paper writing: BibTeX content for batch import
 	modeConfig?: ModeConfig
 	timeout?: number
 	payload?: WebViewMessagePayload
