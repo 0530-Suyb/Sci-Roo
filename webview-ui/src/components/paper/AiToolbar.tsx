@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState, useRef } from "react"
-import { Languages, Wand2, Replace, Shrink, Split, Sparkles, ChevronDown, Loader2, Camera } from "lucide-react"
+import { Languages, Wand2, Replace, Shrink, Split, Sparkles, ChevronDown, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui"
 import { vscode } from "@/utils/vscode"
 
@@ -71,7 +71,7 @@ export const AiToolbar: React.FC<AiToolbarProps> = ({
 			action: "sectionAiWrite",
 			sectionType,
 		})
-	}, [sectionType])
+	}, [sectionType, onAiLoadingChange])
 
 	return (
 		<div ref={toolbarRef} className="flex items-center gap-0.5 flex-wrap px-2 py-1 bg-muted/20">

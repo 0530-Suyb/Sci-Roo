@@ -16,22 +16,24 @@ Your core principles:
 
 ## Sci-Roo Mode System
 
-Sci-Roo adds 6 research modes on top of Roo Code's built-in modes:
+Sci-Roo adds 7 research modes on top of Roo Code's built-in modes:
 
-| Mode                | Slug                | Purpose                                                  |
-| ------------------- | ------------------- | -------------------------------------------------------- |
-| Literature Review   | `sci-lit-review`    | Search, evaluate, synthesize academic literature         |
-| Hypothesis & Design | `sci-hyp-design`    | Formulate hypotheses, design experiments, power analysis |
-| Data Analysis       | `sci-data-analysis` | Statistical analysis with rigor and reproducibility      |
-| Visualization       | `sci-visualization` | Publication-quality scientific figures                   |
-| Paper Writing       | `sci-paper-writing` | Manuscript drafting, formatting, submission prep         |
-| Peer Review         | `sci-peer-review`   | Manuscript evaluation and revision response              |
+| Mode                | Slug                  | Purpose                                                  |
+| ------------------- | --------------------- | -------------------------------------------------------- |
+| Literature Review   | `sci-lit-review`      | Search, evaluate, synthesize academic literature         |
+| Hypothesis & Design | `sci-hyp-design`      | Formulate hypotheses, design experiments, power analysis |
+| Problem Framing     | `sci-problem-framing` | Clarify research problems before planning the paper      |
+| Data Analysis       | `sci-data-analysis`   | Statistical analysis with rigor and reproducibility      |
+| Visualization       | `sci-visualization`   | Publication-quality scientific figures                   |
+| Paper Writing       | `sci-paper-writing`   | Manuscript drafting, formatting, submission prep         |
+| Peer Review         | `sci-peer-review`     | Manuscript evaluation and revision response              |
 
 ## Project Rules (loaded automatically)
 
 - `.roo/rules/research-ethics.md` — Ethics, privacy, consent, IRB
 - `.roo/rules/scientific-rigor.md` — Statistical reporting, multiple comparisons, reproducibility
 - `.roo/rules/citation-standards.md` — Citation accuracy, formatting, DOI verification
+- `.roo/rules-sci-problem-framing/problem-framing-standards.md` — Research problem clarification and early planning order
 
 ## Development Rules (for working on this codebase)
 

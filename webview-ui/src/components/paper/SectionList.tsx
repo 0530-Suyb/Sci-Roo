@@ -1,10 +1,22 @@
 import React, { useMemo, useState } from "react"
-import { AlertTriangle, CheckCircle2, Circle, Edit3, FileText, Plus, X, Edit2 } from "lucide-react"
+import {
+	AlertTriangle,
+	CheckCircle2,
+	Circle,
+	Edit3,
+	FileText,
+	Plus,
+	X,
+	Edit2,
+	Link2,
+	TriangleAlert,
+} from "lucide-react"
 
 type SectionListProps = {
 	project: any
 	writingState: any
 	wordStatus: any
+	sectionInsights: any
 	selectedSection: string | null
 	onSelectSection: (sectionType: string) => void
 	onAddSection?: (sectionType: string, label: string) => void
@@ -118,6 +130,7 @@ export const SectionList: React.FC<SectionListProps> = ({
 	project,
 	writingState,
 	wordStatus,
+	sectionInsights,
 	selectedSection,
 	onSelectSection,
 	onAddSection,
@@ -130,19 +143,31 @@ export const SectionList: React.FC<SectionListProps> = ({
 
 	const sections = useMemo(() => {
 		const venueType = VENUE_TYPE_MAP[project?.templateId] || "general"
-		return VENUE_TYPE_SECTIONS[venueType] || VENUE_TYPE_SECTIONS.general
-	}, [project?.templateId])
+		const baseSections = VENUE_TYPE_SECTIONS[venueType] || VENUE_TYPE_SECTIONS.general
+		const customConfigs = project?.customSectionConfigs ?? {}
+		return baseSections.map((section) => ({
+			...section,
+			label: customConfigs[section.type]?.label || section.label,
+			targetWordRange: customConfigs[section.type]?.targetWordRange || section.targetWordRange,
+		}))
+	}, [project?.customSectionConfigs, project?.templateId])
 
-	const customConfigs = project?.customSectionConfigs ?? ({} as Record<string, { label?: string }>)
 	const sectionStatus = writingState?.sectionStatus ?? ({} as Record<string, string>)
+	const recentSectionTypes = useMemo(() => {
+		return Object.entries((sectionInsights ?? {}) as Record<string, any>)
+			.filter(([, insight]) => insight?.lastEditedAt)
+			.sort((a, b) => String(b[1]?.lastEditedAt).localeCompare(String(a[1]?.lastEditedAt)))
+			.slice(0, 2)
+			.map(([key]) => key)
+	}, [sectionInsights])
 
 	const totalWords = writingState?.totalWords ?? 0
 	const targetWords = writingState?.targetWords ?? 8000
 	const progressPct = targetWords > 0 ? Math.min(100, Math.round((totalWords / targetWords) * 100)) : 0
 
 	const getWordCount = (sectionType: string): number | undefined => {
-		if (wordStatus?.[sectionType] !== undefined) {
-			return wordStatus[sectionType]
+		if (wordStatus?.[sectionType]?.wordCount !== undefined) {
+			return wordStatus[sectionType].wordCount
 		}
 		return undefined
 	}
@@ -164,7 +189,7 @@ export const SectionList: React.FC<SectionListProps> = ({
 		setRenameValue(section.label)
 	}
 
-	const handleFinishRename = (sectionType: string, e: React.KeyboardEvent | React.FocusEvent) => {
+	const handleFinishRename = (sectionType: string, _e: React.KeyboardEvent | React.FocusEvent) => {
 		if (renameValue.trim() && onRenameSection) {
 			onRenameSection(sectionType, renameValue.trim())
 		}
@@ -219,6 +244,10 @@ export const SectionList: React.FC<SectionListProps> = ({
 					const status = sectionStatus[section.type] || "outline"
 					const over = isOverLimit(section.type, words)
 					const isRenaming = renamingSection === section.type
+					const insight = sectionInsights?.[section.type]
+					const missingCitationCount = insight?.missingCitationCount ?? 0
+					const readiness = insight?.readiness ?? "ready"
+					const isRecent = recentSectionTypes.includes(section.type)
 
 					return (
 						<button
@@ -251,12 +280,15 @@ export const SectionList: React.FC<SectionListProps> = ({
 											onClick={(e) => e.stopPropagation()}
 										/>
 									) : (
-										<span className="truncate">
-											{customConfigs[section.type]?.label || section.label}
-										</span>
+										<span className="truncate">{section.label}</span>
 									)}
 									{!section.required && (
 										<span className="text-[10px] text-muted-foreground/60">opt</span>
+									)}
+									{isRecent && !isRenaming && (
+										<span className="rounded-full bg-sky-100 px-1 py-0.5 text-[9px] text-sky-700">
+											recent
+										</span>
 									)}
 								</div>
 								<div className="flex items-center gap-0.5 shrink-0">
@@ -300,6 +332,28 @@ export const SectionList: React.FC<SectionListProps> = ({
 								<div className="flex items-center gap-1 mt-0.5 text-[10px] text-red-500">
 									<AlertTriangle className="w-2.5 h-2.5" />
 									<span>Over limit</span>
+								</div>
+							)}
+							{!over && readiness !== "ready" && !isRenaming && (
+								<div className="mt-1 flex flex-wrap items-center gap-1 text-[10px]">
+									{missingCitationCount > 0 && (
+										<span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-amber-700">
+											<Link2 className="w-2.5 h-2.5" />
+											{missingCitationCount} missing cite
+										</span>
+									)}
+									{readiness === "blocked" && (
+										<span className="inline-flex items-center gap-1 rounded-full bg-muted px-1.5 py-0.5 text-muted-foreground">
+											<TriangleAlert className="w-2.5 h-2.5" />
+											Needs draft
+										</span>
+									)}
+									{readiness === "needs-work" && missingCitationCount === 0 && (
+										<span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-1.5 py-0.5 text-sky-700">
+											<TriangleAlert className="w-2.5 h-2.5" />
+											Needs polish
+										</span>
+									)}
 								</div>
 							)}
 							{/* Progress bar */}

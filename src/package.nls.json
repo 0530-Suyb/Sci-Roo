@@ -5,7 +5,7 @@
 	"views.terminalMenu.label": "Sci Roo",
 	"views.activitybar.title": "Sci Roo",
 	"views.sidebar.name": "Sci Roo",
-	"command.newTask.title": "New Task",
+	"command.newTask.title": "Agent Chat",
 	"command.history.title": "Task History",
 	"command.marketplace.title": "Marketplace",
 	"command.openInEditor.title": "Open in Editor",
@@ -50,5 +50,17 @@
 	"settings.debugProxy.tlsInsecure.description": "Accept self-signed certificates from the proxy. **Required for MITM inspection.** ⚠️ Insecure — only use for local debugging.",
 	"command.dataStudio.title": "Data Studio",
 	"command.researchPipeline.title": "Research Pipeline",
-	"command.paperWriting.title": "Paper Writing"
+	"command.paperWriting.title": "Paper Writing",
+	"command.paperRewriteSelection.title": "Rewrite Selection",
+	"command.paperRephraseSelection.title": "Rephrase Selection",
+	"command.paperMakeConciseSelection.title": "Make Selection Concise",
+	"command.paperMakeAcademicSelection.title": "Make Selection More Academic",
+	"command.paperExpandAcademicParagraph.title": "Expand Into Academic Paragraph",
+	"command.paperAddCitationPlaceholder.title": "Add Citation Placeholder",
+	"command.paperTranslateSelectionChinese.title": "Translate Selection to Chinese",
+	"command.paperTranslateSelectionEnglish.title": "Translate Selection to English",
+	"command.paperOpenManuscript.title": "Open Main Manuscript",
+	"command.paperBuildManuscript.title": "Build Manuscript PDF",
+	"command.paperViewPdf.title": "View Manuscript PDF",
+	"command.paperOpenSourceControl.title": "Open Source Control"
 }

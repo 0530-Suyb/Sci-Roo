@@ -40,6 +40,18 @@ export const commandIds = [
 	"dataStudioButtonClicked",
 	"researchPipelineButtonClicked",
 	"paperWritingButtonClicked",
+	"paperRewriteSelection",
+	"paperRephraseSelection",
+	"paperMakeConciseSelection",
+	"paperMakeAcademicSelection",
+	"paperExpandAcademicParagraph",
+	"paperAddCitationPlaceholder",
+	"paperTranslateSelectionChinese",
+	"paperTranslateSelectionEnglish",
+	"paperOpenManuscript",
+	"paperBuildManuscript",
+	"paperViewPdf",
+	"paperOpenSourceControl",
 
 	"openInNewTab",
 

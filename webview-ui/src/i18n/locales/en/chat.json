@@ -39,8 +39,8 @@
 		"tooltip": "Try the operation again"
 	},
 	"startNewTask": {
-		"title": "Start New Task",
-		"tooltip": "Begin a new task"
+		"title": "Start Agent Chat",
+		"tooltip": "Begin a new agent chat"
 	},
 	"proceedAnyways": {
 		"title": "Proceed Anyways",
@@ -108,8 +108,8 @@
 		"tooltip": "Resume the current task"
 	},
 	"terminate": {
-		"title": "New task",
-		"tooltip": "Start a new task"
+		"title": "Agent chat",
+		"tooltip": "Start a new agent chat"
 	},
 	"cancel": {
 		"title": "Cancel",

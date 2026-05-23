@@ -1,5 +1,7 @@
 export { handleUri } from "./handleUri"
 export { registerCommands } from "./registerCommands"
 export { registerCodeActions } from "./registerCodeActions"
+export { registerPaperEditorActions } from "./registerPaperEditorActions"
+export { registerPaperWorkspaceIntegration } from "./registerPaperWorkspaceIntegration"
 export { registerTerminalActions } from "./registerTerminalActions"
 export { CodeActionProvider } from "./CodeActionProvider"

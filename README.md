@@ -1,262 +1,158 @@
-# Sci-Roo 工程介绍
+# Sci-Roo
 
-Science Roo (Sci-Roo) — 一站式 AI 辅助科研平台，基于 Roo Code 增强，覆盖文献调研 → 假设设计 → 数据分析 → 可视化 → 论文写作 → 同行评审的完整科研工作流。
+Sci-Roo 是一个面向科研工作流的 VS Code AI 扩展，覆盖从研究问题澄清、文献阅读、实验分析到论文写作和同行评审的完整链路。
 
-## 架构总览
+## 最新工作区更新
 
-```
-Sci-Roo/
-├── src/                          ← ★ 插件本体 (VS Code Extension)
-├── webview-ui/                   ← ★ React 前端 UI
-├── packages/                     ← 共享库 (types, core, cloud, telemetry...)
-├── apps/                         ← 独立应用 (web版、CLI、评测工具)
-├── mcp-servers/                  ← MCP 服务器 (PubMed, arXiv...)
-├── .roo/                         ← 科研模式/规则/技能配置
-├── scripts/                      ← 构建/安装脚本
-├── schemas/                      ← JSON Schema
-├── turbo.json                    ← Turborepo 构建流水线
-├── pnpm-workspace.yaml           ← pnpm 工作区定义
-└── tsconfig.json                 ← 根 TypeScript 配置
-```
+最近一轮围绕科研工作流做了几项重要调整：
 
----
+- `Research Pipeline` 已改为默认首页，不再由原来的 `New Task` 作为初始进入面板
+- 原 `New Task` 现在面向用户统一命名为 `Agent Chat`
+- 项目初始化入口统一收敛到 `Research Pipeline > Project Workspace`
+- Sci-Roo 现在只允许在当前 VS Code 打开的根目录内初始化和工作
+- `Research Pipeline` 会在项目创建后显示独立的 `Agent Chat`、`Read Paper`、`Data Studio`、`Paper Writing` 状态卡片
+- `Agent Chat` 卡片默认进入 `sci-problem-framing` mode，并自动基于项目 description 发起“先研究问题、后文章规划”的引导对话
+- 项目创建时填写的 `description` 会写入 `problem/research-questions.md` 开头，并作为后续研究问题澄清的背景
 
-## 核心包
+补充文档：
 
-| 文件夹                        | 包名                          | 作用                                                   |
-| ----------------------------- | ----------------------------- | ------------------------------------------------------ |
-| `src/`                        | `sci-roo`                     | 插件后端：Agent 引擎、工具、LLM Provider、webview 通信 |
-| `webview-ui/`                 | `@roo-code/vscode-webview`    | 插件前端：React + Tailwind UI 面板                     |
-| `packages/types/`             | `@roo-code/types`             | 共享类型定义，所有包都依赖它                           |
-| `packages/core/`              | `@roo-code/core`              | 共享核心逻辑                                           |
-| `packages/telemetry/`         | `@roo-code/telemetry`         | 遥测/埋点                                              |
-| `packages/cloud/`             | `@roo-code/cloud`             | 云服务集成                                             |
-| `packages/ipc/`               | `@roo-code/ipc`               | 进程间通信                                             |
-| `packages/build/`             | `@roo-code/build`             | 构建配置                                               |
-| `packages/config-eslint/`     | `@roo-code/config-eslint`     | ESLint 共享配置                                        |
-| `packages/config-typescript/` | `@roo-code/config-typescript` | TypeScript 共享配置                                    |
-| `packages/evals/`             | `@roo-code/evals`             | 评测框架                                               |
-| `packages/vscode-shim/`       | `@roo-code/vscode-shim`       | VS Code API 垫片                                       |
+- [README - research pipeline workspace.md](<README - research pipeline workspace.md>)
+- [README - paper writing workspace.md](<README - paper writing workspace.md>)
+- [finished.md](finished.md)
 
----
+## 产品定位
 
-## 应用
+Sci-Roo 的核心目标是把科研工作流拆成清晰协作的几个阶段：
 
-| 文件夹                 | 包名                       | 作用               |
-| ---------------------- | -------------------------- | ------------------ |
-| `apps/cli/`            | `@roo-code/cli`            | 命令行工具         |
-| `apps/web-roo-code/`   | `@roo-code/web-roo-code`   | Web 版（Next.js）  |
-| `apps/web-evals/`      | `@roo-code/web-evals`      | 内部评测 Web 应用  |
-| `apps/vscode-e2e/`     | `@roo-code/vscode-e2e`     | VS Code 端到端测试 |
-| `apps/vscode-nightly/` | `@roo-code/vscode-nightly` | 每夜构建版         |
+1. 明确研究问题
+2. 阅读和组织相关文献
+3. 设计实验与分析方案
+4. 执行分析和生成结果
+5. 撰写与修订论文
 
----
+当前更推荐的使用路径是：
 
-## 插件内部结构
+1. 打开一个 VS Code 根目录
+2. 进入 `Research Pipeline`
+3. 在 `Project Workspace` 中初始化当前根目录
+4. 点击 `Agent Chat`，先澄清研究问题
+5. 逐步形成：
+    - `problem/research-questions.md`
+    - `task/paper-plan.md`
+6. 再进入：
+    - `Read Paper`
+    - `Data Studio`
+    - `Paper Writing`
 
-### `src/` 后端
+## 内置科研模式
 
-| 目录                              | 作用                                                                                                                                  |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/core/tools/`                 | Agent 工具（ApplyDiff、EditFile、ReadFile、ExecuteCommand、SearchLiterature、GenerateFigure、GenerateManuscript、FormatCitations...） |
-| `src/core/prompts/`               | 系统提示词构建，包含各模式的自定义指令生成                                                                                            |
-| `src/core/webview/`               | 前后端通信（ClineProvider 主控制器、messageHandler 消息分发）                                                                         |
-| `src/core/task/`                  | 任务执行引擎（Task.ts、工具调用循环）                                                                                                 |
-| `src/core/config/`                | 配置管理（ContextProxy、ProviderSettingsManager、CustomModesManager）                                                                 |
-| `src/core/assistant-message/`     | 助手消息渲染（工具调用描述、用户确认 UI）                                                                                             |
-| `src/core/checkpoints/`           | 任务检查点/回滚                                                                                                                       |
-| `src/services/literature/`        | 文献管理器（LiteratureManager）                                                                                                       |
-| `src/services/research-pipeline/` | 研究流水线管理器（ResearchPipelineManager）                                                                                           |
-| `src/services/paper/`             | 论文写作服务（PaperProjectManager, ReferenceManager, PaperSectionManager, VenueTemplateManager）                                      |
-| `src/services/data-studio/`       | 数据工作室管理器（DataStudioManager）                                                                                                 |
-| `src/services/mcp/`               | MCP 协议 Hub（McpHub、McpServerManager）                                                                                              |
-| `src/services/skills/`            | 技能管理器（SkillsManager、skillInvocation）                                                                                          |
-| `src/services/code-index/`        | 代码索引（Qdrant 向量搜索）                                                                                                           |
-| `src/services/search/`            | 文件搜索（ripgrep）                                                                                                                   |
-| `src/activate/`                   | 扩展激活入口（extension.ts → activate/index.ts → registerCommands.ts）                                                                |
-| `src/api/providers/`              | 30+ LLM API 适配器（Anthropic、OpenAI、Gemini、DeepSeek...）                                                                          |
-| `src/shared/`                     | 共享工具（ExtensionState、WebviewMessage、ProfileValidator、modes、tools）                                                            |
-| `src/utils/`                      | 工具函数（Git、FS、日志、token 计数）                                                                                                 |
-| `src/i18n/`                       | 后端国际化（18 种语言）                                                                                                               |
-| `src/integrations/`               | 编辑器/终端/主题集成                                                                                                                  |
+当前内置 7 个科研模式：
 
-### `webview-ui/` 前端
+| slug                  | 模式名                   | 作用                           |
+| --------------------- | ------------------------ | ------------------------------ |
+| `sci-lit-review`      | Literature Review        | 搜索、评估和整理文献           |
+| `sci-hyp-design`      | Hypothesis & Design      | 假设设计与实验规划             |
+| `sci-problem-framing` | Research Problem Framing | 先澄清研究问题，再整理文章规划 |
+| `sci-data-analysis`   | Data Analysis            | 数据分析、统计检验与复现脚本   |
+| `sci-visualization`   | Visualization            | 生成论文级图表                 |
+| `sci-paper-writing`   | Paper Writing            | manuscript 写作与修订          |
+| `sci-peer-review`     | Peer Review              | 同行评审与回复意见             |
 
-| 目录                          | 作用                                                             |
-| ----------------------------- | ---------------------------------------------------------------- |
-| `src/components/chat/`        | 聊天界面（ChatView、ChatTextArea、TaskHeader、Markdown 渲染...） |
-| `src/components/settings/`    | 设置面板（SettingsView、API 配置、模型选择器...）                |
-| `src/components/literature/`  | 文献库面板（LiteratureView）                                     |
-| `src/components/data-studio/` | 数据工作室面板（DataStudioView）                                 |
-| `src/components/research/`    | 研究流水线面板（ResearchPipelineView）                           |
-| `src/components/paper/`       | 论文写作面板（PaperWritingView）                                 |
-| `src/components/marketplace/` | 市场面板                                                         |
-| `src/components/cloud/`       | 云服务面板                                                       |
-| `src/components/history/`     | 任务历史面板                                                     |
-| `src/components/welcome/`     | 欢迎页面                                                         |
-| `src/components/ui/`          | 基础 UI 组件（Button、Input、Dialog、Select...）                 |
-| `src/components/common/`      | 通用组件（CodeBlock、DiffView、MarkdownBlock、MermaidBlock...）  |
-| `src/context/`                | React 状态管理（ExtensionStateContext）                          |
-| `src/i18n/locales/`           | 18 种语言翻译文件                                                |
-| `src/hooks/`                  | 自定义 React Hooks                                               |
+其中新增的 `sci-problem-framing` 专门用于：
 
----
+- 从项目 description 出发
+- 通过偏苏格拉底式提问先澄清研究问题
+- 先写 `problem/research-questions.md`
+- 再形成 `task/paper-plan.md`
 
-## 依赖关系
+## 当前工作区结构
 
-```
-packages/types/          ← 所有包都引用它
-     ↓
-packages/core/  packages/telemetry/  packages/cloud/  packages/ipc/  ...
-     ↓
-src/ (插件后端)            ← 引用所有 packages/*
-     ↓  vscode.postMessage()
-webview-ui/ (插件前端)      ← 引用 packages/types
-```
+### Research Pipeline
 
----
+`Research Pipeline` 是默认首页，负责：
 
-## 前端路由与通信
+- 初始化当前 VS Code 根目录
+- 展示研究流程卡片
+- 启动问题澄清型 `Agent Chat`
+- 作为 `Read Paper`、`Data Studio`、`Paper Writing` 的统一入口
 
-### Tab 路由
+### Agent Chat
 
-`App.tsx` 中定义 `Tab` 类型：`"chat" | "settings" | "history" | "marketplace" | "cloud" | "literature" | "dataStudio" | "researchPipeline" | "paperWriting"`
+`Agent Chat` 是原 `New Task` 的新名称。
 
-通过 `tabsByMessageAction` 将后端消息映射到 Tab：
+从 `Research Pipeline` 进入时，它会：
 
-| 后端 action                     | 前端 Tab           | 工具栏位置 |
-| ------------------------------- | ------------------ | ---------- |
-| `plusButtonClicked`             | `chat`             | 主栏 1     |
-| `researchPipelineButtonClicked` | `researchPipeline` | 主栏 2     |
-| `literatureButtonClicked`       | `literature`       | 主栏 3     |
-| `dataStudioButtonClicked`       | `dataStudio`       | 主栏 4     |
-| `paperWritingButtonClicked`     | `paperWriting`     | 主栏 5     |
-| `historyButtonClicked`          | `history`          | 溢出菜单   |
-| `popoutButtonClicked`           | (新标签页)         | 溢出菜单   |
-| `settingsButtonClicked`         | `settings`         | 溢出菜单   |
-| `cloudButtonClicked`            | `cloud`            | 溢出菜单   |
-| `marketplaceButtonClicked`      | `marketplace`      | 溢出菜单   |
+- 默认切到 `sci-problem-framing`
+- 自动带上项目上下文发起对话
+- 先帮助用户梳理研究问题，再进入文章规划
 
-### 数据流
+### Paper Writing Workspace
 
-```
-用户点击按钮 → registerCommands.ts 触发命令
-  → ClineProvider.postMessageToWebview() 发送消息到前端
-    → App.tsx onMessage() 接收并切换 Tab
-      → 渲染对应组件（ChatView / LiteratureView / ResearchPipelineView ...）
+`Paper Writing Workspace` 现在主要负责：
 
-前端用户操作 → vscode.postMessage() 发送消息到后端
-  → webviewMessageHandler.ts 分发处理
-    → 调用对应服务（LiteratureManager / ResearchPipelineManager / PaperWritingManager ...）
-```
+- manuscript 写作状态
+- 引用与 `.bib` 检查
+- revision log
+- 选中文本的局部 AI 改写
 
-### 关键文件
+它不再是项目创建主入口。
 
-| 文件                                                 | 作用                                    |
-| ---------------------------------------------------- | --------------------------------------- |
-| `src/extension.ts`                                   | 扩展入口                                |
-| `src/activate/index.ts`                              | 激活逻辑                                |
-| `src/activate/registerCommands.ts`                   | VS Code 命令注册                        |
-| `src/core/webview/ClineProvider.ts`                  | Webview 主控制器                        |
-| `src/core/webview/webviewMessageHandler.ts`          | 前端消息分发器                          |
-| `src/core/webview/literatureMessageHandler.ts`       | 文献相关消息处理                        |
-| `src/core/webview/researchPipelineMessageHandler.ts` | 研究流水线消息处理                      |
-| `src/core/webview/paperWritingMessageHandler.ts`     | 论文写作消息处理                        |
-| `src/shared/tools.ts`                                | 工具注册表                              |
-| `src/shared/modes.ts`                                | 内置模式注册（含 Sci-Roo 6 个科研模式） |
-| `packages/types/src/mode.ts`                         | 内置模式定义（DEFAULT_MODES）           |
-| `packages/types/src/research.ts`                     | 科研相关类型定义                        |
-| `webview-ui/src/App.tsx`                             | 前端根组件 + 路由                       |
-| `webview-ui/src/context/ExtensionStateContext.tsx`   | 全局状态                                |
+## 代码结构
 
----
+这是一个 pnpm monorepo，主要目录包括：
 
-## 配置系统
+- `src/`
+    - VS Code 扩展后端
+- `webview-ui/`
+    - React webview 前端
+- `packages/`
+    - 共享类型、核心逻辑、telemetry 等
+- `apps/`
+    - CLI、Web、E2E 等独立应用
+- `.roo/`
+    - 规则、skills、科研模式相关资产
 
-### 插件清单
+与本轮工作最相关的目录：
 
-| 文件                     | 作用                                                           |
-| ------------------------ | -------------------------------------------------------------- |
-| `src/package.json`       | 扩展清单（name、displayName、commands、menus、keybindings...） |
-| `src/package.nls.json`   | 默认（英文）本地化字符串                                       |
-| `src/package.nls.*.json` | 各语言本地化（zh-CN、ja、de...18 种）                          |
+- `src/services/research-pipeline/`
+- `src/services/paper/`
+- `src/core/webview/`
+- `webview-ui/src/components/research/`
+- `webview-ui/src/components/paper/`
+- `webview-ui/src/components/chat/`
 
-### 内置科研模式
+## 本轮新增或重要调整的能力
 
-`packages/types/src/mode.ts` 的 `DEFAULT_MODES` 中内置 6 个科研模式，安装插件即用：
+- `Project Workspace` 卡片只围绕当前 VS Code 根目录工作
+- 项目创建时会初始化：
+    - `.roo/project.json`
+    - `problem/research-questions.md`
+    - `task/paper-plan.md`
+- 项目 description 会展示在 `Project Workspace` 卡片中
+- `Agent Chat` 卡片点击后自动进入 `sci-problem-framing` 并起一轮引导式对话
+- 移除了无效的 `paperProjectOpen` 消息链
+- 修复了 `ExtensionStateContext` 重复实例化问题
+- 修复了 `Agent Chat` 自动起聊时 `ChatTextArea` 的 `trim()` 崩溃问题
 
-| slug                | 模式名                 | 功能                 |
-| ------------------- | ---------------------- | -------------------- |
-| `sci-lit-review`    | 📚 Literature Review   | 文献搜索、评估、综述 |
-| `sci-hyp-design`    | 🔬 Hypothesis & Design | 假设设计、实验方案   |
-| `sci-data-analysis` | 📊 Data Analysis       | 数据分析、统计检验   |
-| `sci-visualization` | 📈 Visualization       | 科学图表生成         |
-| `sci-paper-writing` | ✍️ Paper Writing       | 手稿撰写、格式排版   |
-| `sci-peer-review`   | 🔍 Peer Review         | 同行评审、意见回复   |
+## 构建与验证
 
-### Roo 规则/技能
-
-| 路径                | 作用                                                           |
-| ------------------- | -------------------------------------------------------------- |
-| `.roo/rules/`       | 全局规则（科研伦理、科学严谨性、引用标准、可复现性、隐私保护） |
-| `.roo/rules-sci-*/` | 各科研模式专用规则                                             |
-| `.roo/skills/`      | 技能定义（文献检索、统计检验、图表生成、引用管理、功效分析）   |
-
----
-
-## MCP 生态
-
-| 服务器   | 文件                           | 说明                       |
-| -------- | ------------------------------ | -------------------------- |
-| PubMed   | `mcp-servers/pubmed/server.py` | NCBI Entrez API，文献搜索  |
-| arXiv    | `mcp-servers/arxiv/server.py`  | arXiv 公共 API，预印本搜索 |
-| Python/R | (MCP 配置)                     | 交互式数据分析内核         |
-| Zotero   | (MCP 配置)                     | 引用管理同步               |
-
----
-
-## LLM 提供商
-
-`src/api/providers/` 下支持 30+ 提供商：
-
-Anthropic、OpenAI、OpenAI Codex、OpenAI Compatible、OpenRouter、Gemini、Vertex AI、DeepSeek、Mistral、XAI、Bedrock、LM Studio、Ollama、Fireworks、VS Code LM...
-
-每个 Provider 继承自 `BaseProvider`，提供统一的 `completePrompt()` / `streamResponse()` 接口。
-
----
-
-## 构建命令
+常用命令：
 
 ```bash
-# 完整构建
 pnpm build
+pnpm exec tsc -p webview-ui/tsconfig.json --noEmit
+pnpm exec tsc -p src/tsconfig.json --noEmit
+```
 
-# 只构建插件
-pnpm --filter @roo-code/types --filter @roo-code/vscode-webview --filter sci-roo build
+开发扩展：
 
-# 分步构建
-pnpm --filter @roo-code/types build          # 类型定义
-pnpm --filter @roo-code/vscode-webview build # 前端 UI
-pnpm --filter sci-roo bundle                 # 插件后端
-
-# 打包 VSIX
-pnpm vsix
-
-# VS Code 扩展开发主机启动
+```bash
 code --extensionDevelopmentPath="./src" .
 ```
 
----
+## 相关文档
 
-## 技术栈
-
-| 层       | 技术                                          |
-| -------- | --------------------------------------------- |
-| 构建     | pnpm workspaces + Turborepo + esbuild + Vite  |
-| 后端     | TypeScript (ES2022)、Node.js 20.19.2          |
-| 前端     | React 18 + Tailwind CSS + Radix UI + Vite     |
-| 类型     | tsup + Zod                                    |
-| AI SDK   | Vercel AI SDK、Anthropic SDK、OpenAI Node SDK |
-| 向量搜索 | Qdrant                                        |
-| 国际化   | i18next（18 种语言）                          |
-| MCP      | @modelcontextprotocol/sdk                     |
+- [README - research pipeline workspace.md](<README - research pipeline workspace.md>)
+- [README - paper writing workspace.md](<README - paper writing workspace.md>)
+- [finished.md](finished.md)
+- [AGENTS.md](AGENTS.md)

@@ -154,7 +154,15 @@ export interface ExtensionStateContextType extends ExtensionState {
 	paperSnapshotState?: any
 }
 
-export const ExtensionStateContext = createContext<ExtensionStateContextType | undefined>(undefined)
+const extensionStateContextGlobal = globalThis as typeof globalThis & {
+	__sciRooExtensionStateContext__?: React.Context<ExtensionStateContextType | undefined>
+}
+
+export const ExtensionStateContext =
+	extensionStateContextGlobal.__sciRooExtensionStateContext__ ??
+	(extensionStateContextGlobal.__sciRooExtensionStateContext__ = createContext<ExtensionStateContextType | undefined>(
+		undefined,
+	))
 
 export const mergeExtensionState = (prevState: ExtensionState, newState: Partial<ExtensionState>) => {
 	const { customModePrompts: prevCustomModePrompts, experiments: prevExperiments, ...prevRest } = prevState

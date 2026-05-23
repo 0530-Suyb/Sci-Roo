@@ -1,271 +1,390 @@
-import React, { useState, useCallback, useEffect } from "react"
-import { ArrowLeft, FlaskConical, Plus, Lightbulb, Beaker, BarChart3, FileText, CheckCircle } from "lucide-react"
-import { useAppTranslation } from "@/i18n/TranslationContext"
+import React, { useState, useCallback, useEffect, useMemo } from "react"
+import {
+	ArrowLeft,
+	Beaker,
+	BookOpenText,
+	ChevronRight,
+	FileSearch,
+	FlaskConical,
+	FolderOpen,
+	MessagesSquare,
+} from "lucide-react"
 import { useExtensionState } from "@/context/ExtensionStateContext"
 import { Tab, TabContent, TabHeader } from "../common/Tab"
-import { Button, Input } from "@/components/ui"
+import { Button } from "@/components/ui"
 import { vscode } from "@/utils/vscode"
+import { ProjectCreateForm } from "../paper/ProjectCreateForm"
 
 type ResearchPipelineViewProps = {
-	onDone: () => void
+	onDone?: () => void
 }
-
-const STAGE_LABELS: Record<string, { label: string; icon: React.ReactNode }> = {
-	planning: { label: "Planning", icon: <Lightbulb className="w-4 h-4" /> },
-	"literature-review": { label: "Literature", icon: <FlaskConical className="w-4 h-4" /> },
-	"hypothesis-design": { label: "Hypotheses", icon: <Lightbulb className="w-4 h-4" /> },
-	"data-collection": { label: "Data Collection", icon: <Beaker className="w-4 h-4" /> },
-	"data-analysis": { label: "Analysis", icon: <BarChart3 className="w-4 h-4" /> },
-	visualization: { label: "Visualization", icon: <BarChart3 className="w-4 h-4" /> },
-	writing: { label: "Writing", icon: <FileText className="w-4 h-4" /> },
-	"peer-review": { label: "Review", icon: <CheckCircle className="w-4 h-4" /> },
-	published: { label: "Published", icon: <CheckCircle className="w-4 h-4" /> },
-}
-
-const ALL_STAGES = Object.keys(STAGE_LABELS)
 
 const ResearchPipelineView: React.FC<ResearchPipelineViewProps> = ({ onDone }) => {
-	const { t: _t } = useAppTranslation()
-	const { researchPipelineState } = useExtensionState()
-	const state = researchPipelineState || {}
+	const { paperProjectState, readPaperRetrievalState, dataStudioState, cwd } = useExtensionState()
+	const workspaceProject = paperProjectState?.project ?? null
+	const workspaceState = paperProjectState?.workspaceState ?? null
+	const retrievals = readPaperRetrievalState?.retrievals ?? []
+	const selectedRetrieval = readPaperRetrievalState?.selectedRetrieval
+	const studioState = (dataStudioState || {}) as {
+		lastRun?: { timestamp: number }
+		history?: unknown[]
+		files?: string[]
+		running?: boolean
+	}
 
-	const project = state.project
+	const [workspaceExpanded, setWorkspaceExpanded] = useState(false)
+	const [pendingProjectSetup, setPendingProjectSetup] = useState(false)
 
-	const [showCreate, setShowCreate] = useState(false)
-	const [newName, setNewName] = useState("")
-	const [newDesc, setNewDesc] = useState("")
-	const [newNote, setNewNote] = useState("")
-	const [newHypothesis, setNewHypothesis] = useState("")
+	const requestWorkspaceState = useCallback(() => {
+		vscode.postMessage({ type: "paperProjectLoad" })
+	}, [])
 
-	const handleRequestList = useCallback(() => {
-		vscode.postMessage({ type: "researchPipelineList" })
+	const requestReadPaperState = useCallback(() => {
+		vscode.postMessage({ type: "readPaperListRetrievals", values: { cwd } })
+	}, [cwd])
+
+	const requestDataStudioState = useCallback(() => {
+		vscode.postMessage({ type: "dataStudioList" })
 	}, [])
 
 	useEffect(() => {
-		handleRequestList()
-	}, [handleRequestList])
+		requestWorkspaceState()
+		requestReadPaperState()
+		requestDataStudioState()
+	}, [requestWorkspaceState, requestReadPaperState, requestDataStudioState])
 
-	const handleCreateProject = useCallback(() => {
-		if (!newName.trim()) return
-		vscode.postMessage({
-			type: "researchPipelineRun",
-			action: "createProject",
-			query: newName,
-			text: newDesc,
-		})
-		setShowCreate(false)
-		setNewName("")
-		setNewDesc("")
-	}, [newName, newDesc])
+	useEffect(() => {
+		if (pendingProjectSetup && workspaceProject) {
+			setWorkspaceExpanded(false)
+			setPendingProjectSetup(false)
+		}
+	}, [pendingProjectSetup, workspaceProject])
 
-	const handleSetStage = useCallback((stage: string) => {
-		vscode.postMessage({
-			type: "researchPipelineRun",
-			action: "setStage",
-			query: stage,
-		})
+	const switchPanel = useCallback((tab: "chat" | "readPaper" | "dataStudio" | "paperWriting") => {
+		vscode.postMessage({ type: "switchTab", tab } as any)
 	}, [])
 
-	const handleAddHypothesis = useCallback(() => {
-		if (!newHypothesis.trim()) return
-		vscode.postMessage({
-			type: "researchPipelineRun",
-			action: "addHypothesis",
-			text: newHypothesis,
-		})
-		setNewHypothesis("")
-	}, [newHypothesis])
+	const openAgentChat = useCallback(() => {
+		if (!workspaceProject) {
+			return
+		}
 
-	const handleAddNote = useCallback(() => {
-		if (!newNote.trim()) return
-		vscode.postMessage({
-			type: "researchPipelineRun",
-			action: "addNote",
-			text: newNote,
-		})
-		setNewNote("")
-	}, [newNote])
+		const projectDescription = workspaceProject.description?.trim() || "No project description was provided yet."
+		const prompt = [
+			`Project name: ${workspaceProject.name}`,
+			`Project description: ${projectDescription}`,
+			`Target template or venue: ${workspaceProject.templateId}`,
+			`Workspace root: ${workspaceProject.rootPath || cwd || "Unknown workspace root"}`,
+			"Goal: start with the project description, clarify the research problem first, and only then organize the initial paper plan.",
+			"Use a Socratic dialogue style: ask a small number of focused questions, explain why each question matters, and refine the framing after each answer.",
+			"Do not jump straight to a paper outline before the problem is clear.",
+			"Please treat `problem/research-questions.md` as the primary file for the first phase and `task/paper-plan.md` as the follow-up file after the problem is clarified.",
+			"Help me turn this description into a concrete research problem, scope boundaries, and candidate research questions before planning the manuscript.",
+		].join("\n")
+
+		vscode.postMessage({ type: "mode", text: "sci-problem-framing" } as any)
+		vscode.postMessage({ type: "switchTab", tab: "chat" } as any)
+		vscode.postMessage({ type: "newTask", text: prompt } as any)
+	}, [cwd, workspaceProject])
+
+	const workspaceStatus = workspaceProject ? "Created" : "Not Created"
+	const workspaceSummary = useMemo(() => {
+		if (!workspaceProject) {
+			return "This VS Code root has not been initialized as a Sci-Roo project yet."
+		}
+		const manuscript = workspaceState?.manuscript
+		const description = workspaceProject.description?.trim()
+		const manuscriptStatus = manuscript?.exists ? `${manuscript.wordCount ?? 0} words` : "manuscript not ready"
+		return description
+			? `${workspaceProject.name} | ${workspaceProject.templateId} | ${description}`
+			: `${workspaceProject.name} | ${workspaceProject.templateId} | ${manuscriptStatus}`
+	}, [workspaceProject, workspaceState?.manuscript])
+
+	const readPaperSummary = useMemo(() => {
+		if (selectedRetrieval?.title) {
+			const saved = selectedRetrieval?.result_summary?.total_saved ?? 0
+			return `${selectedRetrieval.title} | ${saved} saved | ${selectedRetrieval.run_status ?? "draft"}`
+		}
+		if (retrievals.length > 0) {
+			return `${retrievals.length} retrieval plan${retrievals.length > 1 ? "s" : ""} ready`
+		}
+		return "No retrieval plan yet."
+	}, [retrievals.length, selectedRetrieval])
+
+	const dataStudioSummary = useMemo(() => {
+		if (studioState.running) {
+			return "Analysis is currently running."
+		}
+		if (studioState.lastRun?.timestamp) {
+			return `Last run ${formatRelativeTime(studioState.lastRun.timestamp)} | ${studioState.files?.length ?? 0} files`
+		}
+		return "No analysis run yet."
+	}, [studioState.files?.length, studioState.lastRun?.timestamp, studioState.running])
+
+	const paperWritingSummary = useMemo(() => {
+		const manuscript = workspaceState?.manuscript
+		if (!manuscript?.exists) {
+			return "Manuscript not ready yet."
+		}
+		return `${manuscript.wordCount ?? 0} words | ${manuscript.hasPdf ? "PDF ready" : "drafting"}`
+	}, [workspaceState?.manuscript])
+
+	const agentChatSummary = useMemo(() => {
+		if (!workspaceProject) {
+			return "Initialize the project workspace first."
+		}
+		return "Start from the project description, clarify the research problem first, then organize the initial paper plan. The outcome should be consolidated into problem/research-questions.md and task/paper-plan.md."
+	}, [workspaceProject])
 
 	return (
 		<Tab>
 			<TabHeader>
 				<div className="flex items-center gap-2">
-					<Button variant="ghost" size="icon" onClick={onDone}>
-						<ArrowLeft className="w-4 h-4" />
-					</Button>
-					<FlaskConical className="w-5 h-5" />
+					{onDone && (
+						<Button variant="ghost" size="icon" onClick={onDone}>
+							<ArrowLeft className="h-4 w-4" />
+						</Button>
+					)}
+					<FlaskConical className="h-5 w-5" />
 					<h3 className="text-lg font-semibold">Research Pipeline</h3>
-				</div>
-				<div className="flex items-center gap-2 ml-auto">
-					<Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
-						<Plus className="w-4 h-4" />
-						<span className="ml-1">New Project</span>
-					</Button>
 				</div>
 			</TabHeader>
 
-			<TabContent>
-				<div className="flex flex-col h-full">
-					{/* Create project dialog */}
-					{showCreate && (
-						<div className="px-4 pt-4 pb-4 border-b">
-							<div className="space-y-2">
-								<Input
-									placeholder="Project name..."
-									value={newName}
-									onChange={(e) => setNewName(e.target.value)}
-									onKeyDown={(e) => e.key === "Enter" && handleCreateProject()}
-								/>
-								<Input
-									placeholder="Description (optional)..."
-									value={newDesc}
-									onChange={(e) => setNewDesc(e.target.value)}
-									onKeyDown={(e) => e.key === "Enter" && handleCreateProject()}
-								/>
-								<div className="flex gap-2">
-									<Button variant="primary" size="sm" onClick={handleCreateProject}>
-										Create
-									</Button>
-									<Button variant="ghost" size="sm" onClick={() => setShowCreate(false)}>
-										Cancel
-									</Button>
-								</div>
-							</div>
-						</div>
-					)}
-
-					{!project && !showCreate && (
-						<div className="flex-1 flex items-center justify-center p-8">
-							<div className="text-center text-muted-foreground">
-								<FlaskConical className="w-12 h-12 mx-auto mb-3 opacity-50" />
-								<p>No research project yet.</p>
-								<p className="text-sm mt-1">Create a project to track your research workflow.</p>
-							</div>
-						</div>
-					)}
-
-					{project && (
-						<div className="flex-1 overflow-auto">
-							{/* Project info */}
-							<div className="px-4 py-3 border-b">
-								<h4 className="font-semibold">{project.name}</h4>
-								{project.description && (
-									<p className="text-sm text-muted-foreground mt-1">{project.description}</p>
-								)}
-								<p className="text-xs text-muted-foreground mt-1">
-									Created: {new Date(project.createdAt).toLocaleDateString()}
+			<TabContent className="bg-[radial-gradient(circle_at_top_left,rgba(210,235,255,0.12),transparent_28%),linear-gradient(180deg,transparent,rgba(255,255,255,0.02))]">
+				<div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+					<section className="rounded-[28px] border border-vscode-panel-border bg-card/95 p-6 shadow-[0_18px_50px_rgba(0,0,0,0.16)]">
+						<div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+							<div className="max-w-2xl">
+								<p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
+									Workflow Board
+								</p>
+								<h4 className="mt-2 font-serif text-3xl leading-tight">
+									Start with the current VS Code root, then unlock the research workspaces.
+								</h4>
+								<p className="mt-3 text-sm text-muted-foreground">
+									Sci-Roo only works inside the folder currently opened in VS Code. Initialize this
+									root first, then the agent chat, literature, analysis, and writing cards will appear
+									with their own status.
 								</p>
 							</div>
-
-							{/* Stage selector */}
-							<div className="px-4 py-3 border-b">
-								<p className="text-xs font-medium text-muted-foreground mb-2">Current Stage</p>
-								<div className="flex flex-wrap gap-1">
-									{ALL_STAGES.map((stage) => (
-										<button
-											key={stage}
-											onClick={() => handleSetStage(stage)}
-											className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
-												project.stage === stage
-													? "bg-primary text-primary-foreground"
-													: "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-											}`}>
-											{STAGE_LABELS[stage]?.icon}
-											{STAGE_LABELS[stage]?.label || stage}
-										</button>
-									))}
-								</div>
+							<div className="rounded-2xl border border-dashed border-vscode-panel-border bg-background/60 px-4 py-3 text-sm text-muted-foreground">
+								Current VS Code root:
+								<span className="ml-2 font-medium text-foreground">{cwd ?? "No folder opened"}</span>
 							</div>
+						</div>
+					</section>
 
-							{/* Hypotheses */}
-							<div className="px-4 py-3 border-b">
-								<div className="flex items-center justify-between mb-2">
-									<span className="text-xs font-medium text-muted-foreground">
-										<Lightbulb className="w-3 h-3 inline mr-1" />
-										Hypotheses ({project.hypotheses?.length || 0})
-									</span>
-								</div>
-								{(project.hypotheses || []).map((h: any) => (
-									<div
-										key={h.id}
-										className="flex items-start gap-2 py-1 px-2 rounded hover:bg-muted/50">
-										<span
-											className={`w-2 h-2 mt-1.5 rounded-full shrink-0 ${
-												h.status === "supported"
-													? "bg-green-500"
-													: h.status === "rejected"
-														? "bg-red-500"
-														: "bg-yellow-500"
-											}`}
-										/>
-										<span className="text-sm">{h.statement}</span>
-									</div>
-								))}
-								<div className="flex gap-2 mt-2">
-									<Input
-										placeholder="New hypothesis..."
-										value={newHypothesis}
-										onChange={(e) => setNewHypothesis(e.target.value)}
-										onKeyDown={(e) => e.key === "Enter" && handleAddHypothesis()}
-										className="text-xs"
-									/>
-									<Button variant="outline" size="sm" onClick={handleAddHypothesis}>
-										<Plus className="w-3 h-3" />
-									</Button>
-								</div>
+					<WorkflowCard
+						title="1. Project Workspace"
+						subtitle="Initialize the current VS Code root as a Sci-Roo project"
+						summary={workspaceSummary}
+						icon={<FolderOpen className="h-5 w-5" />}
+						accent="from-[#c7ecff]/25 via-[#f7f4e8]/60 to-[#f6d9c7]/20"
+						actionLabel={
+							workspaceExpanded
+								? "Collapse"
+								: workspaceProject
+									? "View Status"
+									: "Create Project Workspace"
+						}
+						onAction={() => setWorkspaceExpanded((open) => !open)}
+						meta={cwd ? truncatePath(cwd) : "Open a folder in VS Code first"}
+						status={workspaceStatus}
+						expanded={workspaceExpanded}>
+						<div className="border-t bg-muted/20 px-5 py-4">
+							<div className="flex flex-wrap gap-3">
+								<InlineInfo label="VS Code root" value={cwd ?? "No folder opened"} />
+								<InlineInfo label="Project status" value={workspaceStatus} />
+								{workspaceProject && (
+									<InlineInfo label="Template" value={workspaceProject.templateId} />
+								)}
 							</div>
+							{!cwd && (
+								<p className="mt-4 text-sm text-muted-foreground">
+									Open a folder in VS Code first. Sci-Roo only allows project setup inside the current
+									root.
+								</p>
+							)}
+							{cwd && !workspaceProject && (
+								<p className="mt-4 text-sm text-muted-foreground">
+									This root is not initialized yet. Create the Sci-Roo workspace here to enable the
+									rest of the research flow.
+								</p>
+							)}
+							{workspaceProject && (
+								<div className="mt-4 space-y-3 text-sm text-muted-foreground">
+									<p>
+										This VS Code root is already initialized. The cards below now use this root as
+										their shared working context.
+									</p>
+									{workspaceProject.description?.trim() && (
+										<div className="rounded-2xl border bg-background/70 p-3">
+											<p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+												Project Background
+											</p>
+											<p className="mt-2 text-sm text-foreground">
+												{workspaceProject.description.trim()}
+											</p>
+										</div>
+									)}
+								</div>
+							)}
+						</div>
+						{cwd && !workspaceProject && (
+							<div className="border-t">
+								<ProjectCreateForm
+									compactRootOnly
+									onSubmitted={() => setPendingProjectSetup(true)}
+									onCancel={() => {
+										setWorkspaceExpanded(false)
+										setPendingProjectSetup(false)
+									}}
+								/>
+							</div>
+						)}
+					</WorkflowCard>
 
-							{/* Experiments */}
-							<div className="px-4 py-3 border-b">
-								<span className="text-xs font-medium text-muted-foreground mb-2 block">
-									<Beaker className="w-3 h-3 inline mr-1" />
-									Experiments ({project.experiments?.length || 0})
-								</span>
-								{(project.experiments || []).map((exp: any) => (
-									<div key={exp.id} className="py-1 px-2 rounded hover:bg-muted/50">
-										<span className="text-sm font-medium">{exp.name}</span>
-										<span className="text-xs text-muted-foreground ml-2">{exp.design}</span>
-										{exp.sampleSize > 0 && (
-											<span className="text-xs text-muted-foreground ml-2">
-												N={exp.sampleSize}
-											</span>
-										)}
-									</div>
-								))}
-							</div>
-
-							{/* Notes */}
-							<div className="px-4 py-3">
-								<span className="text-xs font-medium text-muted-foreground mb-2 block">
-									Notes ({project.notes?.length || 0})
-								</span>
-								<div className="flex gap-2 mb-3">
-									<Input
-										placeholder="Add a note..."
-										value={newNote}
-										onChange={(e) => setNewNote(e.target.value)}
-										onKeyDown={(e) => e.key === "Enter" && handleAddNote()}
-										className="text-xs"
-									/>
-									<Button variant="outline" size="sm" onClick={handleAddNote}>
-										<Plus className="w-3 h-3" />
-									</Button>
-								</div>
-								{(project.notes || []).slice(0, 20).map((note: any) => (
-									<div
-										key={note.id}
-										className="py-1 px-2 rounded hover:bg-muted/50 text-xs text-muted-foreground">
-										<span className="text-foreground">{note.text}</span>
-										<span className="ml-2">{new Date(note.timestamp).toLocaleString()}</span>
-									</div>
-								))}
-							</div>
+					{workspaceProject && (
+						<div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-4">
+							<WorkflowCard
+								title="2. Agent Chat"
+								subtitle="Clarify the research problem, then organize the paper plan"
+								summary={agentChatSummary}
+								icon={<MessagesSquare className="h-5 w-5" />}
+								accent="from-[#f7e5c9]/24 via-[#fff7ea]/60 to-[#e8f0ff]/18"
+								actionLabel="Open Agent Chat"
+								onAction={openAgentChat}
+								meta="problem/ -> task/"
+								status="Ready"
+							/>
+							<WorkflowCard
+								title="3. Read Paper"
+								subtitle="Literature retrieval and screening"
+								summary={readPaperSummary}
+								icon={<FileSearch className="h-5 w-5" />}
+								accent="from-[#d5f1ff]/20 via-[#eefbff]/60 to-[#e8ecff]/18"
+								actionLabel="Open Read Paper"
+								onAction={() => switchPanel("readPaper")}
+								meta={`${retrievals.length} retrieval plan${retrievals.length === 1 ? "" : "s"}`}
+								status={selectedRetrieval?.run_status ? String(selectedRetrieval.run_status) : "Idle"}
+							/>
+							<WorkflowCard
+								title="4. Data Studio"
+								subtitle="Experiments, scripts, and outputs"
+								summary={dataStudioSummary}
+								icon={<Beaker className="h-5 w-5" />}
+								accent="from-[#dff5dc]/24 via-[#f7fbf4]/65 to-[#d2f1f2]/20"
+								actionLabel="Open Data Studio"
+								onAction={() => switchPanel("dataStudio")}
+								meta={`${studioState.history?.length ?? 0} saved run${(studioState.history?.length ?? 0) === 1 ? "" : "s"}`}
+								status={studioState.running ? "Running" : "Ready"}
+							/>
+							<WorkflowCard
+								title="5. Paper Writing"
+								subtitle="Draft, build, and revise the manuscript"
+								summary={paperWritingSummary}
+								icon={<BookOpenText className="h-5 w-5" />}
+								accent="from-[#fbe0cf]/24 via-[#fff7f0]/60 to-[#f1e8d9]/18"
+								actionLabel="Open Paper Writing"
+								onAction={() => switchPanel("paperWriting")}
+								meta={workspaceProject.templateId}
+								status={workspaceState?.manuscript?.hasPdf ? "PDF Ready" : "Drafting"}
+							/>
 						</div>
 					)}
 				</div>
 			</TabContent>
 		</Tab>
 	)
+}
+
+const WorkflowCard = ({
+	title,
+	subtitle,
+	summary,
+	icon,
+	accent,
+	actionLabel,
+	onAction,
+	meta,
+	status,
+	expanded = false,
+	children,
+}: {
+	title: string
+	subtitle: string
+	summary: string
+	icon: React.ReactNode
+	accent: string
+	actionLabel: string
+	onAction: () => void
+	meta: string
+	status: string
+	expanded?: boolean
+	children?: React.ReactNode
+}) => (
+	<div
+		className={`group overflow-hidden rounded-[28px] border border-vscode-panel-border bg-card text-left shadow-[0_14px_36px_rgba(0,0,0,0.1)] transition-all ${
+			expanded
+				? "shadow-[0_20px_46px_rgba(0,0,0,0.14)]"
+				: "hover:-translate-y-0.5 hover:shadow-[0_20px_46px_rgba(0,0,0,0.14)]"
+		}`}>
+		<button type="button" onClick={onAction} className="w-full text-left">
+			<div className={`h-28 bg-gradient-to-br ${accent} px-5 py-4`}>
+				<div className="flex items-start justify-between">
+					<div className="rounded-2xl border border-black/5 bg-white/70 p-2 text-foreground shadow-sm dark:bg-black/10">
+						{icon}
+					</div>
+					<div className="flex items-center gap-3">
+						<span className="rounded-full border border-black/10 bg-white/70 px-2.5 py-1 text-[11px] text-foreground shadow-sm dark:bg-black/10">
+							{status}
+						</span>
+						<ChevronRight
+							className={`h-4 w-4 text-muted-foreground transition-transform ${
+								expanded ? "rotate-90" : "group-hover:translate-x-1"
+							}`}
+						/>
+					</div>
+				</div>
+			</div>
+			<div className="px-5 py-5">
+				<p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{title}</p>
+				<h5 className="mt-2 text-lg font-semibold">{subtitle}</h5>
+				<p className="mt-3 min-h-[44px] text-sm text-muted-foreground">{summary}</p>
+				<div className="mt-4 flex items-center justify-between gap-3">
+					<span className="truncate text-[11px] text-muted-foreground">{meta}</span>
+					<span className="rounded-full bg-foreground px-3 py-1 text-xs text-background">{actionLabel}</span>
+				</div>
+			</div>
+		</button>
+		{expanded && children}
+	</div>
+)
+
+const InlineInfo = ({ label, value }: { label: string; value: string }) => (
+	<div className="rounded-full border bg-background px-3 py-1.5 text-xs">
+		<span className="text-muted-foreground">{label}: </span>
+		<span className="text-foreground">{value}</span>
+	</div>
+)
+
+function formatRelativeTime(timestamp: number): string {
+	const delta = Date.now() - timestamp
+	const minutes = Math.max(1, Math.round(delta / 60000))
+	if (minutes < 60) return `${minutes}m ago`
+	const hours = Math.round(minutes / 60)
+	if (hours < 24) return `${hours}h ago`
+	const days = Math.round(hours / 24)
+	return `${days}d ago`
+}
+
+function truncatePath(filePath: string): string {
+	const normalized = filePath.replace(/\\/g, "/")
+	const parts = normalized.split("/")
+	if (parts.length <= 4) {
+		return normalized
+	}
+	return `.../${parts.slice(-4).join("/")}`
 }
 
 export default React.memo(ResearchPipelineView)

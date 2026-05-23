@@ -70,7 +70,11 @@ export const registerCommands = (options: RegisterCommandOptions) => {
 	}
 }
 
-const getCommandsMap = ({ context, outputChannel, provider }: RegisterCommandOptions): Record<CommandId, any> => ({
+const getCommandsMap = ({
+	context,
+	outputChannel,
+	provider,
+}: RegisterCommandOptions): Partial<Record<CommandId, any>> => ({
 	activationCompleted: () => {},
 	cloudButtonClicked: () => {
 		const visibleProvider = getVisibleProviderOrLog(outputChannel)

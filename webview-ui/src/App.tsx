@@ -10,7 +10,7 @@ import { MarketplaceViewStateManager } from "./components/marketplace/Marketplac
 import { vscode } from "./utils/vscode"
 import { telemetryClient } from "./utils/TelemetryClient"
 import { initializeSourceMaps, exposeSourceMapsForDebugging } from "./utils/sourceMapInitializer"
-import { ExtensionStateContextProvider, useExtensionState } from "./context/ExtensionStateContext"
+import { ExtensionStateContextProvider, useExtensionState } from "@src/context/ExtensionStateContext"
 import ChatView, { ChatViewRef } from "./components/chat/ChatView"
 import HistoryView from "./components/history/HistoryView"
 import SettingsView, { SettingsViewRef } from "./components/settings/SettingsView"
@@ -92,7 +92,7 @@ const App = () => {
 	const marketplaceStateManager = useMemo(() => new MarketplaceViewStateManager(), [])
 
 	const [showAnnouncement, setShowAnnouncement] = useState(false)
-	const [tab, setTab] = useState<Tab>("chat")
+	const [tab, setTab] = useState<Tab>("researchPipeline")
 
 	const [deleteMessageDialogState, setDeleteMessageDialogState] = useState<DeleteMessageDialogState>({
 		isOpen: false,
@@ -265,11 +265,16 @@ const App = () => {
 					organizations={cloudOrganizations}
 				/>
 			)}
-			{tab === "literature" && <LiteratureView onDone={() => switchTab("chat")} />}
-			{tab === "readPaper" && <ReadPaperView onDone={() => switchTab("chat")} />}
-			{tab === "dataStudio" && <DataStudioView onDone={() => switchTab("chat")} />}
-			{tab === "researchPipeline" && <ResearchPipelineView onDone={() => switchTab("chat")} />}
-			{tab === "paperWriting" && <PaperWritingView onDone={() => switchTab("chat")} />}
+			{tab === "literature" && <LiteratureView onDone={() => switchTab("researchPipeline")} />}
+			{tab === "readPaper" && <ReadPaperView onDone={() => switchTab("researchPipeline")} />}
+			{tab === "dataStudio" && <DataStudioView onDone={() => switchTab("researchPipeline")} />}
+			{tab === "researchPipeline" && <ResearchPipelineView />}
+			{tab === "paperWriting" && (
+				<PaperWritingView
+					onDone={() => switchTab("researchPipeline")}
+					onOpenResearchPipeline={() => switchTab("researchPipeline")}
+				/>
+			)}
 			<ChatView
 				ref={chatViewRef}
 				isHidden={tab !== "chat"}

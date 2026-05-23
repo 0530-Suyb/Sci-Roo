@@ -634,9 +634,9 @@ export interface WebviewMessage {
 		| "paperWritingList"
 		| "paperWritingAiOp"
 		| "paperProjectCreate"
-		| "paperProjectOpen"
 		| "paperProjectList"
 		| "paperProjectLoad"
+		| "paperWorkspaceCommand"
 		| "paperSectionLoad"
 		| "paperSectionSave"
 		| "paperSectionStatus"
@@ -690,13 +690,15 @@ export interface WebviewMessage {
 	slug?: string
 	sectionType?: string
 	sectionLabel?: string
+	sectionStatusValue?: "outline" | "draft" | "revised" | "final"
 	description?: string
-	customStructure?: any // Paper writing: section type identifier
+	customStructure?: unknown // Paper writing: custom directory structure payload
+	targetWordRange?: [number, number] // Paper writing: custom section word range
 	directoryTemplate?: string // Paper writing: directory template ID
 	venueTemplateId?: string // Paper writing: venue template ID
 	operation?: string // Paper writing: AI operation name
 	option?: string // Paper writing: AI operation option
-	entry?: any // Paper writing: reference entry data
+	entry?: unknown // Paper writing: reference entry data
 	newTemplateId?: string // Paper writing: new venue template ID for switching
 	bibtexContent?: string // Paper writing: BibTeX content for batch import
 	modeConfig?: ModeConfig

@@ -3161,7 +3161,7 @@ export const webviewMessageHandler = async (
 		}
 		// Paper Writing v2 messages — routed through paperWritingAction handler
 		case "paperProjectCreate":
-		case "paperProjectOpen":
+		case "paperWorkspaceCommand":
 		case "paperSectionLoad":
 		case "paperSectionSave":
 		case "paperSectionStatus":

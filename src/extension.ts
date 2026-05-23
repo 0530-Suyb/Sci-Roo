@@ -44,6 +44,8 @@ import {
 	handleUri,
 	registerCommands,
 	registerCodeActions,
+	registerPaperEditorActions,
+	registerPaperWorkspaceIntegration,
 	registerTerminalActions,
 	CodeActionProvider,
 } from "./activate"
@@ -353,6 +355,8 @@ export async function activate(context: vscode.ExtensionContext) {
 	)
 
 	registerCodeActions(context)
+	registerPaperEditorActions({ context, provider })
+	registerPaperWorkspaceIntegration({ context, provider })
 	registerTerminalActions(context)
 
 	// Allows other extensions to activate once Roo is ready.

@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from "react"
 import { TelemetryEventName } from "@roo-code/types"
 import { vscode } from "@/utils/vscode"
 import { telemetryClient } from "@/utils/TelemetryClient"
-import { useExtensionState } from "@/context/ExtensionStateContext"
+import { useExtensionState } from "@src/context/ExtensionStateContext"
 
 interface UseCloudUpsellOptions {
 	onAuthSuccess?: () => void

@@ -111,6 +111,66 @@
 				"icon": "$(file-text)"
 			},
 			{
+				"command": "sci-roo.paperRewriteSelection",
+				"title": "%command.paperRewriteSelection.title%",
+				"category": "Paper Writing"
+			},
+			{
+				"command": "sci-roo.paperRephraseSelection",
+				"title": "%command.paperRephraseSelection.title%",
+				"category": "Paper Writing"
+			},
+			{
+				"command": "sci-roo.paperMakeConciseSelection",
+				"title": "%command.paperMakeConciseSelection.title%",
+				"category": "Paper Writing"
+			},
+			{
+				"command": "sci-roo.paperMakeAcademicSelection",
+				"title": "%command.paperMakeAcademicSelection.title%",
+				"category": "Paper Writing"
+			},
+			{
+				"command": "sci-roo.paperExpandAcademicParagraph",
+				"title": "%command.paperExpandAcademicParagraph.title%",
+				"category": "Paper Writing"
+			},
+			{
+				"command": "sci-roo.paperAddCitationPlaceholder",
+				"title": "%command.paperAddCitationPlaceholder.title%",
+				"category": "Paper Writing"
+			},
+			{
+				"command": "sci-roo.paperTranslateSelectionChinese",
+				"title": "%command.paperTranslateSelectionChinese.title%",
+				"category": "Paper Writing"
+			},
+			{
+				"command": "sci-roo.paperTranslateSelectionEnglish",
+				"title": "%command.paperTranslateSelectionEnglish.title%",
+				"category": "Paper Writing"
+			},
+			{
+				"command": "sci-roo.paperOpenManuscript",
+				"title": "%command.paperOpenManuscript.title%",
+				"category": "Paper Writing"
+			},
+			{
+				"command": "sci-roo.paperBuildManuscript",
+				"title": "%command.paperBuildManuscript.title%",
+				"category": "Paper Writing"
+			},
+			{
+				"command": "sci-roo.paperViewPdf",
+				"title": "%command.paperViewPdf.title%",
+				"category": "Paper Writing"
+			},
+			{
+				"command": "sci-roo.paperOpenSourceControl",
+				"title": "%command.paperOpenSourceControl.title%",
+				"category": "Paper Writing"
+			},
+			{
 				"command": "sci-roo.popoutButtonClicked",
 				"title": "%command.openInEditor.title%",
 				"icon": "$(link-external)"
@@ -215,6 +275,46 @@
 				{
 					"command": "sci-roo.improveCode",
 					"group": "1_actions@3"
+				},
+				{
+					"command": "sci-roo.paperRewriteSelection",
+					"group": "2_paper@1",
+					"when": "editorHasSelection && (editorLangId == latex || editorLangId == markdown || resourceExtname == .tex || resourceExtname == .md)"
+				},
+				{
+					"command": "sci-roo.paperRephraseSelection",
+					"group": "2_paper@2",
+					"when": "editorHasSelection && (editorLangId == latex || editorLangId == markdown || resourceExtname == .tex || resourceExtname == .md)"
+				},
+				{
+					"command": "sci-roo.paperMakeConciseSelection",
+					"group": "2_paper@3",
+					"when": "editorHasSelection && (editorLangId == latex || editorLangId == markdown || resourceExtname == .tex || resourceExtname == .md)"
+				},
+				{
+					"command": "sci-roo.paperMakeAcademicSelection",
+					"group": "2_paper@4",
+					"when": "editorHasSelection && (editorLangId == latex || editorLangId == markdown || resourceExtname == .tex || resourceExtname == .md)"
+				},
+				{
+					"command": "sci-roo.paperExpandAcademicParagraph",
+					"group": "2_paper@5",
+					"when": "editorHasSelection && (editorLangId == latex || editorLangId == markdown || resourceExtname == .tex || resourceExtname == .md)"
+				},
+				{
+					"command": "sci-roo.paperAddCitationPlaceholder",
+					"group": "2_paper@6",
+					"when": "editorHasSelection && (editorLangId == latex || editorLangId == markdown || resourceExtname == .tex || resourceExtname == .md)"
+				},
+				{
+					"command": "sci-roo.paperTranslateSelectionChinese",
+					"group": "2_paper@7",
+					"when": "editorHasSelection && (editorLangId == latex || editorLangId == markdown || resourceExtname == .tex || resourceExtname == .md)"
+				},
+				{
+					"command": "sci-roo.paperTranslateSelectionEnglish",
+					"group": "2_paper@8",
+					"when": "editorHasSelection && (editorLangId == latex || editorLangId == markdown || resourceExtname == .tex || resourceExtname == .md)"
 				}
 			],
 			"terminal/context": [

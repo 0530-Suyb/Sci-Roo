@@ -20,28 +20,44 @@ export class ResearchPipelineManager {
 	private project: ResearchProject | undefined
 	private projects: ResearchProject[] = []
 	private initialized = false
+	private loadedRoot: string | undefined
 
 	constructor(provider: ClineProvider) {
 		this.providerRef = new WeakRef(provider)
 	}
 
 	get cwd(): string | undefined {
-		return this.providerRef.deref()?.cwd
+		const provider = this.providerRef.deref()
+		return provider?.getPaperProjectManager()?.getProjectRoot() ?? provider?.cwd
 	}
 
 	async initialize(): Promise<void> {
 		if (this.initialized) return
-		const cwd = this.cwd
-		if (cwd) {
-			await fs.mkdir(path.join(cwd, PIPELINE_DIR), { recursive: true })
-			await this.loadProject()
-		}
+		await this.ensureLoaded()
 		this.initialized = true
 	}
 
-	private async loadProject(): Promise<void> {
+	private async ensureLoaded(): Promise<void> {
 		const cwd = this.cwd
-		if (!cwd) return
+		if (!cwd) {
+			this.project = undefined
+			this.projects = []
+			this.loadedRoot = undefined
+			return
+		}
+
+		if (this.loadedRoot === cwd) {
+			return
+		}
+
+		await fs.mkdir(path.join(cwd, PIPELINE_DIR), { recursive: true })
+		await this.loadProject(cwd)
+		this.loadedRoot = cwd
+	}
+
+	private async loadProject(cwd: string): Promise<void> {
+		this.project = undefined
+		this.projects = []
 
 		const projectPath = path.join(cwd, PIPELINE_DIR, PIPELINE_FILE)
 		try {
@@ -62,6 +78,7 @@ export class ResearchPipelineManager {
 	}
 
 	private async saveProject(): Promise<void> {
+		await this.ensureLoaded()
 		const cwd = this.cwd
 		if (!cwd) return
 
@@ -74,6 +91,7 @@ export class ResearchPipelineManager {
 	}
 
 	async createProject(name: string, description: string): Promise<ResearchProject> {
+		await this.ensureLoaded()
 		const now = new Date().toISOString()
 		const project: ResearchProject = {
 			id: `proj_${Date.now()}`,
@@ -95,6 +113,7 @@ export class ResearchPipelineManager {
 	}
 
 	async setStage(stage: PipelineStage): Promise<void> {
+		await this.ensureLoaded()
 		if (!this.project) return
 		this.project.stage = stage
 		this.project.updatedAt = new Date().toISOString()
@@ -102,6 +121,7 @@ export class ResearchPipelineManager {
 	}
 
 	async addHypothesis(statement: string, rationale: string, derivedFrom: string[] = []): Promise<Hypothesis> {
+		await this.ensureLoaded()
 		if (!this.project) {
 			throw new Error("No active research project")
 		}
@@ -123,6 +143,7 @@ export class ResearchPipelineManager {
 	}
 
 	async addExperiment(name: string, design: string): Promise<ExperimentEntry> {
+		await this.ensureLoaded()
 		if (!this.project) {
 			throw new Error("No active research project")
 		}
@@ -151,6 +172,7 @@ export class ResearchPipelineManager {
 		script: string,
 		outputSummary: string,
 	): Promise<AnalysisResult> {
+		await this.ensureLoaded()
 		if (!this.project) {
 			throw new Error("No active research project")
 		}
@@ -171,6 +193,7 @@ export class ResearchPipelineManager {
 	}
 
 	async addNote(text: string): Promise<PipelineNote> {
+		await this.ensureLoaded()
 		if (!this.project) {
 			throw new Error("No active research project")
 		}
@@ -192,6 +215,7 @@ export class ResearchPipelineManager {
 	}
 
 	async getState(): Promise<ResearchPipelineState> {
+		await this.ensureLoaded()
 		return {
 			project: this.project,
 			projects: this.projects,
@@ -199,6 +223,7 @@ export class ResearchPipelineManager {
 	}
 
 	async deleteProject(projectId: string): Promise<void> {
+		await this.ensureLoaded()
 		this.projects = this.projects.filter((p) => p.id !== projectId)
 		if (this.project?.id === projectId) {
 			this.project = this.projects[0]
@@ -214,5 +239,6 @@ export class ResearchPipelineManager {
 		this.project = undefined
 		this.projects = []
 		this.initialized = false
+		this.loadedRoot = undefined
 	}
 }

@@ -1,4 +1,4 @@
-{
+﻿{
 	"greeting": "欢迎使用 Sci Roo",
 	"task": {
 		"title": "任务",
@@ -47,8 +47,8 @@
 		"tooltip": "再次尝试操作"
 	},
 	"startNewTask": {
-		"title": "开始新任务",
-		"tooltip": "开始一个新任务"
+		"title": "Start Agent Chat",
+		"tooltip": "Begin a new agent chat"
 	},
 	"proceedAnyways": {
 		"title": "仍然继续",
@@ -84,8 +84,8 @@
 		"tooltip": "继续当前任务"
 	},
 	"terminate": {
-		"title": "结束",
-		"tooltip": "结束当前任务"
+		"title": "Agent chat",
+		"tooltip": "Start a new agent chat"
 	},
 	"cancel": {
 		"title": "取消",

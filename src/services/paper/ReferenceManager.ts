@@ -19,7 +19,7 @@ export class ReferenceManager {
 	}
 
 	private get cwd(): string | undefined {
-		return this.provider?.cwd
+		return this.provider?.getPaperProjectManager()?.getProjectRoot() ?? this.provider?.cwd
 	}
 
 	// ─── Path Helpers ──────────────────────────────────────────────────
@@ -156,22 +156,19 @@ export class ReferenceManager {
 	async scanTexCitations(): Promise<{ cited: string[]; missing: string[] }> {
 		const cwd = this.cwd
 		if (!cwd) return { cited: [], missing: [] }
-
-		const sectionsDir = path.join(cwd, "latex", "sections")
 		const allKeys = new Set<string>()
+		const texFiles = await this.getTexFilesToScan(cwd)
 
-		try {
-			const files = await fs.readdir(sectionsDir)
-			for (const file of files) {
-				if (!file.endsWith(".tex")) continue
-				const content = await fs.readFile(path.join(sectionsDir, file), "utf-8")
+		for (const filePath of texFiles) {
+			try {
+				const content = await fs.readFile(filePath, "utf-8")
 				const keys = this.extractCiteKeys(content)
 				for (const key of keys) {
 					allKeys.add(key)
 				}
+			} catch {
+				// Skip unreadable files and keep scanning the rest.
 			}
-		} catch {
-			return { cited: [], missing: [] }
 		}
 
 		const cited = Array.from(allKeys)
@@ -184,6 +181,48 @@ export class ReferenceManager {
 		}
 
 		return { cited, missing }
+	}
+
+	private async getTexFilesToScan(projectRoot: string): Promise<string[]> {
+		const paperProject = this.provider?.getPaperProjectManager?.()
+		const primaryManuscriptPath = paperProject?.getPrimaryManuscriptAbsolutePath()
+		if (primaryManuscriptPath && (await this.checkFileExists(primaryManuscriptPath))) {
+			return [primaryManuscriptPath]
+		}
+
+		const latexDir = path.join(projectRoot, "latex")
+		const latexFiles = await this.collectTexFiles(latexDir)
+		if (latexFiles.length > 0) {
+			return latexFiles
+		}
+
+		const legacySectionsDir = path.join(projectRoot, "latex", "sections")
+		return this.collectTexFiles(legacySectionsDir)
+	}
+
+	private async collectTexFiles(dirPath: string): Promise<string[]> {
+		const files: string[] = []
+
+		try {
+			const entries = await fs.readdir(dirPath, { withFileTypes: true })
+			for (const entry of entries) {
+				const fullPath = path.join(dirPath, entry.name)
+				if (entry.isDirectory()) {
+					if (entry.name === "snapshots") {
+						continue
+					}
+					files.push(...(await this.collectTexFiles(fullPath)))
+					continue
+				}
+				if (entry.isFile() && entry.name.endsWith(".tex")) {
+					files.push(fullPath)
+				}
+			}
+		} catch {
+			return []
+		}
+
+		return files
 	}
 
 	private extractCiteKeys(content: string): string[] {

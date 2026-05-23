@@ -197,11 +197,14 @@ export interface PaperProject {
 	name: string
 	description?: string
 	rootPath: string
+	primaryManuscriptPath: string
 	templateId: string
 	templateSource: "builtin" | "custom"
 	directoryTemplate: string
 	stage: PaperProjectStage
-	customSectionConfigs?: Record<SectionType, { label: string; targetWordRange?: [number, number] }>
+	customSectionConfigs?: Partial<
+		Record<SectionType, { label?: string; targetWordRange?: [number, number]; status?: SectionWorkflowStatus }>
+	>
 	createdAt: string
 	updatedAt: string
 }
@@ -253,6 +256,8 @@ export type SectionType =
 	| "limitations"
 	| "appendix"
 
+export type SectionWorkflowStatus = "outline" | "draft" | "revised" | "final"
+
 export interface SectionConfig {
 	type: SectionType
 	label: string
@@ -278,7 +283,7 @@ export interface VenueTemplate {
 
 export interface PaperWritingState {
 	currentSection?: SectionType
-	sectionStatus: Record<SectionType, "outline" | "draft" | "revised" | "final">
+	sectionStatus: Record<SectionType, SectionWorkflowStatus>
 	totalWords: number
 	targetWords: number
 	citationCount: number

@@ -2,6 +2,8 @@ import type { ClineProvider } from "./ClineProvider"
 import type { WebviewMessage } from "@roo-code/types"
 import { singleCompletionHandler } from "../../utils/single-completion-handler"
 import type { SectionType } from "@roo-code/types"
+import { runPaperWorkspaceCommand } from "../../services/paper/paperWorkspaceActions"
+import { buildPaperWorkspaceState } from "../../services/paper/paperWorkspaceState"
 
 // ─── Legacy handlers (kept for backward compat during transition) ────
 
@@ -22,7 +24,12 @@ export async function handlePaperWritingAction(provider: ClineProvider, message:
 		}
 
 		const currentProject = paperProject.getCurrentProject()
-
+		const buildWritingPayload = async (templateId: string, missingCitationKeys: string[] = []) => {
+			const writingState = await sectionMgr.getWritingState(templateId)
+			const wordStatus = await sectionMgr.getSectionWordStatus(templateId)
+			const sectionInsights = await sectionMgr.getSectionInsights(templateId, missingCitationKeys)
+			return { writingState, wordStatus, sectionInsights }
+		}
 		switch (action) {
 			// ── Project Management ──
 			case "projectCreate": {
@@ -42,15 +49,20 @@ export async function handlePaperWritingAction(provider: ClineProvider, message:
 					type: "paperProjectState",
 					paperProjectState: { project },
 				})
-				return
-			}
-			case "projectOpen": {
-				const rootPath = message.text
-				if (!rootPath) return
-				const project = await paperProject.openProject(rootPath)
+				const entries = await referenceMgr.listEntries()
+				const uncatalogued = await referenceMgr.scanUncataloguedPdfs()
+				const { cited, missing } = await referenceMgr.scanTexCitations()
+				const workspaceState = await buildPaperWorkspaceState(provider, project, {
+					missingCitationKeys: missing,
+					citedKeys: cited,
+				})
 				await provider.postMessageToWebview({
 					type: "paperProjectState",
-					paperProjectState: { project },
+					paperProjectState: { project, workspaceState },
+				})
+				await provider.postMessageToWebview({
+					type: "paperReferenceState",
+					paperReferenceState: { entries, uncatalogued, cited, missing },
 				})
 				return
 			}
@@ -63,27 +75,74 @@ export async function handlePaperWritingAction(provider: ClineProvider, message:
 			}
 			case "projectRefresh": {
 				if (!currentProject) return
-				const state = await sectionMgr.getWritingState(currentProject.templateId)
-				const wordStatus = await sectionMgr.getSectionWordStatus(currentProject.templateId)
 				const entries = await referenceMgr.listEntries()
 				const uncatalogued = await referenceMgr.scanUncataloguedPdfs()
+				const { cited, missing } = await referenceMgr.scanTexCitations()
 				const snapshots = await sectionMgr.listSnapshots()
+				const workspaceState = await buildPaperWorkspaceState(provider, currentProject, {
+					missingCitationKeys: missing,
+					citedKeys: cited,
+				})
 				await provider.postMessageToWebview({
 					type: "paperProjectState",
 					paperProjectState: {
 						project: currentProject,
-						writingState: state,
 						referenceEntries: entries,
 						uncatalogued,
+						workspaceState,
 					},
 				})
 				await provider.postMessageToWebview({
-					type: "paperWritingState",
-					paperWritingState: { writingState: state, wordStatus },
+					type: "paperReferenceState",
+					paperReferenceState: { entries, uncatalogued, cited, missing },
 				})
 				await provider.postMessageToWebview({
 					type: "paperSnapshotState",
 					paperSnapshotState: { snapshots },
+				})
+				return
+			}
+			case "projectStageUpdate": {
+				const stage = message.text as any
+				if (!currentProject || !stage) return
+				await paperProject.updateStage(stage)
+				await provider.postMessageToWebview({
+					type: "paperProjectState",
+					paperProjectState: { project: paperProject.getCurrentProject() },
+				})
+				return
+			}
+			case "workspaceCommand": {
+				const command =
+					(message.query as
+						| "paperOpenManuscript"
+						| "paperBuildManuscript"
+						| "paperViewPdf"
+						| "paperOpenSourceControl"
+						| "paperRewriteSelection"
+						| "paperRephraseSelection"
+						| "paperMakeConciseSelection"
+						| "paperMakeAcademicSelection"
+						| "paperExpandAcademicParagraph"
+						| "paperAddCitationPlaceholder"
+						| "paperTranslateSelectionChinese"
+						| "paperTranslateSelectionEnglish"
+						| undefined) ?? undefined
+				if (!command) {
+					return
+				}
+				await runPaperWorkspaceCommand(provider, command)
+				return
+			}
+			case "revisionLogSeed": {
+				if (!currentProject) return
+				const revisionLogPath = await paperProject.ensureRevisionLogTemplate()
+				await provider.postMessageToWebview({
+					type: "paperProjectState",
+					paperProjectState: {
+						project: paperProject.getCurrentProject(),
+						message: `Revision log template ready at ${revisionLogPath}`,
+					},
 				})
 				return
 			}
@@ -93,16 +152,18 @@ export async function handlePaperWritingAction(provider: ClineProvider, message:
 				const sectionType = (message.query as SectionType) || ((message as any).sectionType as SectionType)
 				if (!sectionType || !currentProject) return
 				const { content, wordCount } = await sectionMgr.loadSection(sectionType)
-				const configs = currentProject.templateId
-					? provider.getVenueTemplateManager()?.getSectionConfig(currentProject.templateId, sectionType)
-					: undefined
+				const configs = sectionMgr.getSectionConfig(currentProject.templateId, sectionType)
 				const range = configs?.targetWordRange
+				const sectionStatus = (await sectionMgr.getWritingState(currentProject.templateId)).sectionStatus[
+					sectionType
+				]
 				await provider.postMessageToWebview({
 					type: "paperWritingState",
 					paperWritingState: {
 						sectionType,
 						sectionContent: content,
 						wordCount,
+						sectionStatusValue: sectionStatus,
 						targetWordRange: range,
 						overLimit: range ? wordCount > range[1] : false,
 					},
@@ -121,12 +182,20 @@ export async function handlePaperWritingAction(provider: ClineProvider, message:
 				if (result) {
 					await sectionMgr.saveSection(sectionType, result)
 					const wordCount = sectionMgr.countWords(result)
+					const { missing } = await referenceMgr.scanTexCitations()
+					const { writingState, wordStatus, sectionInsights } = await buildWritingPayload(
+						currentProject.templateId,
+						missing,
+					)
 					await provider.postMessageToWebview({
 						type: "paperWritingState",
 						paperWritingState: {
 							sectionType,
 							sectionContent: result,
 							wordCount,
+							writingState,
+							wordStatus,
+							sectionInsights,
 							saved: true,
 						},
 					})
@@ -136,22 +205,38 @@ export async function handlePaperWritingAction(provider: ClineProvider, message:
 			case "sectionSave": {
 				const sectionType = (message as any).sectionType as SectionType
 				const content = text || ""
-				if (!sectionType) return
+				if (!sectionType || !currentProject) return
 				await sectionMgr.saveSection(sectionType, content)
 				const wordCount = sectionMgr.countWords(content)
+				const { missing } = await referenceMgr.scanTexCitations()
+				const { writingState, wordStatus, sectionInsights } = await buildWritingPayload(
+					currentProject.templateId,
+					missing,
+				)
 				await provider.postMessageToWebview({
 					type: "paperWritingState",
-					paperWritingState: { sectionType, sectionContent: content, wordCount, saved: true },
+					paperWritingState: {
+						sectionType,
+						sectionContent: content,
+						wordCount,
+						wordStatus,
+						sectionStatusValue: writingState.sectionStatus[sectionType],
+						sectionInsights,
+						saved: true,
+					},
 				})
 				return
 			}
 			case "sectionStatus": {
 				if (!currentProject) return
-				const state = await sectionMgr.getWritingState(currentProject.templateId)
-				const wordStatus = await sectionMgr.getSectionWordStatus(currentProject.templateId)
+				const { missing } = await referenceMgr.scanTexCitations()
+				const { writingState, wordStatus, sectionInsights } = await buildWritingPayload(
+					currentProject.templateId,
+					missing,
+				)
 				await provider.postMessageToWebview({
 					type: "paperWritingState",
-					paperWritingState: { writingState: state, wordStatus },
+					paperWritingState: { writingState, wordStatus, sectionInsights },
 				})
 				return
 			}
@@ -160,11 +245,14 @@ export async function handlePaperWritingAction(provider: ClineProvider, message:
 				const sectionLabel = (message as any).sectionLabel as string
 				if (!sectionType || !currentProject) return
 				await sectionMgr.addSection(sectionType, sectionLabel)
-				const state = await sectionMgr.getWritingState(currentProject.templateId)
-				const wordStatus = await sectionMgr.getSectionWordStatus(currentProject.templateId)
+				const { missing } = await referenceMgr.scanTexCitations()
+				const { writingState, wordStatus, sectionInsights } = await buildWritingPayload(
+					currentProject.templateId,
+					missing,
+				)
 				await provider.postMessageToWebview({
 					type: "paperWritingState",
-					paperWritingState: { writingState: state, wordStatus },
+					paperWritingState: { writingState, wordStatus, sectionInsights },
 				})
 				return
 			}
@@ -172,11 +260,14 @@ export async function handlePaperWritingAction(provider: ClineProvider, message:
 				const sectionType = (message as any).sectionType as SectionType
 				if (!sectionType || !currentProject) return
 				await sectionMgr.deleteSection(sectionType)
-				const state = await sectionMgr.getWritingState(currentProject.templateId)
-				const wordStatus = await sectionMgr.getSectionWordStatus(currentProject.templateId)
+				const { missing } = await referenceMgr.scanTexCitations()
+				const { writingState, wordStatus, sectionInsights } = await buildWritingPayload(
+					currentProject.templateId,
+					missing,
+				)
 				await provider.postMessageToWebview({
 					type: "paperWritingState",
-					paperWritingState: { writingState: state, wordStatus },
+					paperWritingState: { writingState, wordStatus, sectionInsights },
 				})
 				return
 			}
@@ -185,24 +276,58 @@ export async function handlePaperWritingAction(provider: ClineProvider, message:
 				const sectionLabel = (message as any).sectionLabel as string
 				if (!sectionType || !sectionLabel || !currentProject) return
 				await sectionMgr.renameSection(sectionType, sectionLabel)
-				// Persist custom label in project.json
-				const custom: Record<string, any> = currentProject.customSectionConfigs ?? {}
-				custom[sectionType] = { ...(custom[sectionType] ?? {}), label: sectionLabel }
-				currentProject.customSectionConfigs = custom
-				currentProject.updatedAt = new Date().toISOString()
-				const { PAPER_PROJECT_DIR, PAPER_PROJECT_FILENAME } = await import("@roo-code/types")
-				const fs2 = await import("fs/promises")
-				const projectPath = (await import("path")).join(
-					currentProject.rootPath,
-					PAPER_PROJECT_DIR,
-					PAPER_PROJECT_FILENAME,
+				const updatedProject = await paperProject.updateSectionConfig(sectionType, { label: sectionLabel })
+				const { missing } = await referenceMgr.scanTexCitations()
+				const { writingState, wordStatus, sectionInsights } = await buildWritingPayload(
+					currentProject.templateId,
+					missing,
 				)
-				await fs2.writeFile(projectPath, JSON.stringify(currentProject, null, 2), "utf-8")
-				const state = await sectionMgr.getWritingState(currentProject.templateId)
-				const wordStatus = await sectionMgr.getSectionWordStatus(currentProject.templateId)
 				await provider.postMessageToWebview({
 					type: "paperWritingState",
-					paperWritingState: { writingState: state, wordStatus },
+					paperWritingState: { writingState, wordStatus, sectionInsights },
+				})
+				await provider.postMessageToWebview({
+					type: "paperProjectState",
+					paperProjectState: { project: updatedProject },
+				})
+				return
+			}
+			case "sectionConfigSave": {
+				const sectionType = (message as any).sectionType as SectionType
+				const targetWordRange = (message as any).targetWordRange as [number, number] | undefined
+				const sectionStatusValue = (message as any).sectionStatusValue as
+					| "outline"
+					| "draft"
+					| "revised"
+					| "final"
+					| undefined
+				if (!sectionType || !currentProject || (!targetWordRange && !sectionStatusValue)) return
+				const updatedProject = await paperProject.updateSectionConfig(sectionType, {
+					...(targetWordRange ? { targetWordRange } : {}),
+					...(sectionStatusValue ? { status: sectionStatusValue } : {}),
+				})
+				const { missing } = await referenceMgr.scanTexCitations()
+				const { writingState, wordStatus, sectionInsights } = await buildWritingPayload(
+					currentProject.templateId,
+					missing,
+				)
+				await provider.postMessageToWebview({
+					type: "paperProjectState",
+					paperProjectState: { project: updatedProject },
+				})
+				await provider.postMessageToWebview({
+					type: "paperWritingState",
+					paperWritingState: {
+						writingState,
+						wordStatus,
+						sectionInsights,
+						targetWordRange,
+						sectionStatusValue: sectionStatusValue ?? writingState.sectionStatus[sectionType],
+						overLimit:
+							targetWordRange && targetWordRange[1] > 0
+								? (wordStatus[sectionType]?.wordCount ?? 0) > targetWordRange[1]
+								: false,
+					},
 				})
 				return
 			}
@@ -224,6 +349,19 @@ export async function handlePaperWritingAction(provider: ClineProvider, message:
 					type: "paperReferenceState",
 					paperReferenceState: { cited, missing, entries },
 				})
+				const workspaceState = await buildPaperWorkspaceState(provider, currentProject, {
+					missingCitationKeys: missing,
+					citedKeys: cited,
+				})
+				if (workspaceState) {
+					await provider.postMessageToWebview({
+						type: "paperProjectState",
+						paperProjectState: {
+							project: currentProject,
+							workspaceState,
+						},
+					})
+				}
 				return
 			}
 			case "referenceGenerateBib": {
@@ -361,13 +499,36 @@ export async function handlePaperWritingList(provider: ClineProvider): Promise<v
 		if (project) {
 			const sectionMgr = provider.getPaperSectionManager()
 			const referenceMgr = provider.getReferenceManager()
-			const state = sectionMgr ? await sectionMgr.getWritingState(project.templateId) : null
 			const entries = referenceMgr ? await referenceMgr.listEntries() : []
 			const uncatalogued = referenceMgr ? await referenceMgr.scanUncataloguedPdfs() : []
+			const citationStatus = referenceMgr ? await referenceMgr.scanTexCitations() : { cited: [], missing: [] }
+			const snapshots = sectionMgr ? await sectionMgr.listSnapshots() : []
+			const workspaceState = await buildPaperWorkspaceState(provider, project, {
+				missingCitationKeys: citationStatus.missing,
+				citedKeys: citationStatus.cited,
+			})
 
 			await provider.postMessageToWebview({
 				type: "paperProjectState",
-				paperProjectState: { project, writingState: state, referenceEntries: entries, uncatalogued },
+				paperProjectState: {
+					project,
+					referenceEntries: entries,
+					uncatalogued,
+					workspaceState,
+				},
+			})
+			await provider.postMessageToWebview({
+				type: "paperReferenceState",
+				paperReferenceState: {
+					entries,
+					uncatalogued,
+					cited: citationStatus.cited,
+					missing: citationStatus.missing,
+				},
+			})
+			await provider.postMessageToWebview({
+				type: "paperSnapshotState",
+				paperSnapshotState: { snapshots },
 			})
 		} else {
 			await provider.postMessageToWebview({
