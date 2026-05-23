@@ -1,23 +1,27 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
 	AlertTriangle,
 	ArrowLeft,
 	CheckCircle2,
+	Ellipsis,
+	Eye,
 	FileText,
 	FolderOpen,
-	GitBranch,
 	Library,
 	Loader2,
-	PanelRightClose,
-	PanelRightOpen,
 	Play,
-	RefreshCcw,
 	ScrollText,
-	Sparkles,
-	Eye,
 } from "lucide-react"
+
 import { useExtensionState } from "@/context/ExtensionStateContext"
-import { Button } from "@/components/ui"
+import {
+	Button,
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "@/components/ui"
 import { vscode } from "@/utils/vscode"
 import { ReferencePanel } from "./ReferencePanel"
 
@@ -27,6 +31,20 @@ type PaperWritingViewProps = {
 }
 
 type SideTab = "references" | "outline" | "checks"
+
+type OutlineItem = {
+	id: string
+	level: 1 | 2 | 3
+	title: string
+	line: number
+}
+
+type NextStepAction = {
+	label: string
+	onClick: () => void
+	disabled?: boolean
+}
+
 const STAGE_OPTIONS = [
 	{ id: "planning", label: "Planning" },
 	{ id: "literature-review", label: "Literature" },
@@ -36,41 +54,57 @@ const STAGE_OPTIONS = [
 	{ id: "submitted", label: "Submitted" },
 ] as const
 
-const TEXT_ACTIONS = [
-	{ label: "Rewrite", command: "paperRewriteSelection" },
-	{ label: "Rephrase", command: "paperRephraseSelection" },
-	{ label: "Concise", command: "paperMakeConciseSelection" },
-	{ label: "Academic", command: "paperMakeAcademicSelection" },
-	{ label: "Expand", command: "paperExpandAcademicParagraph" },
-	{ label: "Add cite placeholder", command: "paperAddCitationPlaceholder" },
-	{ label: "To Chinese", command: "paperTranslateSelectionChinese" },
-	{ label: "To English", command: "paperTranslateSelectionEnglish" },
-]
-
-type OutlineItem = {
-	id: string
-	level: 1 | 2 | 3
-	title: string
-	line: number
-}
+const SELECTION_ACTION_GROUPS = [
+	{
+		label: "Improve",
+		actions: [
+			{ label: "Rewrite", command: "paperRewriteSelection" },
+			{ label: "Rephrase", command: "paperRephraseSelection" },
+			{ label: "Academic", command: "paperMakeAcademicSelection" },
+		],
+	},
+	{
+		label: "Tighten",
+		actions: [
+			{ label: "Concise", command: "paperMakeConciseSelection" },
+			{ label: "Expand", command: "paperExpandAcademicParagraph" },
+			{ label: "Add cite placeholder", command: "paperAddCitationPlaceholder" },
+		],
+	},
+	{
+		label: "Translate",
+		actions: [
+			{ label: "To Chinese", command: "paperTranslateSelectionChinese" },
+			{ label: "To English", command: "paperTranslateSelectionEnglish" },
+		],
+	},
+] as const
 
 const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone, onOpenResearchPipeline }) => {
 	const { paperProjectState, paperReferenceState, paperSnapshotState } = useExtensionState()
 
 	const [loading, setLoading] = useState(true)
-	const [refreshing, setRefreshing] = useState(false)
-	const [sidePanelOpen, setSidePanelOpen] = useState(true)
 	const [sideTab, setSideTab] = useState<SideTab>("references")
+	const [highlightSelectionAssistant, setHighlightSelectionAssistant] = useState(false)
+	const selectionAssistantRef = useRef<HTMLDivElement | null>(null)
 
 	const project = paperProjectState?.project ?? null
 	const workspaceState = paperProjectState?.workspaceState ?? null
+	const manuscript = workspaceState?.manuscript ?? null
+	const editorContext = workspaceState?.editorContext ?? null
+	const gitStatus = workspaceState?.git ?? null
+	const assets = workspaceState?.assets ?? null
+	const checks = useMemo(() => workspaceState?.checks ?? [], [workspaceState?.checks])
+	const outline: OutlineItem[] = manuscript?.outline ?? []
 	const referenceEntries = paperReferenceState?.entries ?? paperProjectState?.referenceEntries ?? []
 	const uncatalogued = paperReferenceState?.uncatalogued ?? paperProjectState?.uncatalogued ?? []
 	const cited = paperReferenceState?.cited ?? null
 	const missing = paperReferenceState?.missing ?? null
 	const bibGenerated = paperReferenceState?.bibGenerated ?? false
 	const bibPreview = paperReferenceState?.bibPreview ?? null
-	const _snapshots = paperSnapshotState?.snapshots ?? []
+	const snapshots = paperSnapshotState?.snapshots ?? []
+	const recommendedAction =
+		workspaceState?.recommendedAction ?? "Open the main manuscript and continue drafting in the editor."
 
 	useEffect(() => {
 		vscode.postMessage({ type: "paperProjectLoad" })
@@ -84,42 +118,69 @@ const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone, onOpenResea
 		}
 	}, [paperProjectState])
 
-	const manuscript = workspaceState?.manuscript ?? null
-	const editorContext = workspaceState?.editorContext ?? null
-	const gitStatus = workspaceState?.git ?? null
-	const assets = workspaceState?.assets ?? null
-	const checks = useMemo(() => workspaceState?.checks ?? [], [workspaceState?.checks])
-	const outline: OutlineItem[] = manuscript?.outline ?? []
-	const recommendedAction =
-		workspaceState?.recommendedAction ?? "Open the main manuscript and continue drafting in the editor."
-	const canRunSelectionActions = !!editorContext?.hasSelection
-	const warningChecks = useMemo(() => checks.filter((check: any) => check.severity === "warning"), [checks])
-	const infoChecks = useMemo(() => checks.filter((check: any) => check.severity === "info"), [checks])
-	const readyChecks = useMemo(() => checks.filter((check: any) => check.severity === "ready"), [checks])
-	const quickWorkspaceSummary = useMemo(() => {
-		if (gitStatus?.available && gitStatus.hasChanges) {
-			return `${gitStatus.changedFiles} changed file${gitStatus.changedFiles > 1 ? "s" : ""} in working tree`
+	useEffect(() => {
+		if (!highlightSelectionAssistant) {
+			return
 		}
-		if (manuscript?.hasPdf) {
-			return "Latest PDF is available"
-		}
-		return "Build the manuscript once this pass feels stable"
-	}, [gitStatus?.available, gitStatus?.changedFiles, gitStatus?.hasChanges, manuscript?.hasPdf])
+		const timer = window.setTimeout(() => setHighlightSelectionAssistant(false), 2200)
+		return () => window.clearTimeout(timer)
+	}, [highlightSelectionAssistant])
 
-	const handleRefreshProject = useCallback(() => {
-		setRefreshing(true)
-		vscode.postMessage({
-			type: "paperProjectCreate",
-			action: "projectRefresh",
-		})
-		setTimeout(() => setRefreshing(false), 2500)
-	}, [])
+	const openProjectFile = useCallback(
+		(relativePath: string | null | undefined, options?: { create?: boolean; content?: string; line?: number }) => {
+			if (!project || !relativePath) {
+				return
+			}
+			const normalizedPath = `${String(project.rootPath).replace(/[\\/]$/, "")}/${relativePath}`.replace(
+				/\//g,
+				"\\",
+			)
+			vscode.postMessage({
+				type: "openFile",
+				text: normalizedPath,
+				values: options,
+			})
+		},
+		[project],
+	)
+
+	const handleWorkspaceCommand = useCallback(
+		(
+			command:
+				| "paperOpenManuscript"
+				| "paperBuildManuscript"
+				| "paperViewPdf"
+				| "paperOpenSourceControl"
+				| "paperRewriteSelection"
+				| "paperRephraseSelection"
+				| "paperMakeConciseSelection"
+				| "paperMakeAcademicSelection"
+				| "paperExpandAcademicParagraph"
+				| "paperAddCitationPlaceholder"
+				| "paperTranslateSelectionChinese"
+				| "paperTranslateSelectionEnglish",
+		) => {
+			vscode.postMessage({
+				type: "paperWorkspaceCommand",
+				action: "workspaceCommand",
+				query: command,
+			})
+		},
+		[],
+	)
 
 	const handleStageChange = useCallback((stage: string) => {
 		vscode.postMessage({
 			type: "paperProjectCreate",
 			action: "projectStageUpdate",
 			text: stage,
+		})
+	}, [])
+
+	const handleRefreshProject = useCallback(() => {
+		vscode.postMessage({
+			type: "paperProjectCreate",
+			action: "projectRefresh",
 		})
 	}, [])
 
@@ -152,61 +213,220 @@ const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone, onOpenResea
 		})
 	}, [])
 
-	const handleWorkspaceCommand = useCallback(
-		(
-			command:
-				| "paperOpenManuscript"
-				| "paperBuildManuscript"
-				| "paperViewPdf"
-				| "paperOpenSourceControl"
-				| "paperRewriteSelection"
-				| "paperRephraseSelection"
-				| "paperMakeConciseSelection"
-				| "paperMakeAcademicSelection"
-				| "paperExpandAcademicParagraph"
-				| "paperAddCitationPlaceholder"
-				| "paperTranslateSelectionChinese"
-				| "paperTranslateSelectionEnglish",
-		) => {
-			vscode.postMessage({
-				type: "paperWorkspaceCommand",
-				action: "workspaceCommand",
-				query: command,
-			})
-		},
-		[],
-	)
+	const focusSelectionAssistant = useCallback(() => {
+		setHighlightSelectionAssistant(true)
+		selectionAssistantRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })
+	}, [])
 
-	const openProjectFile = useCallback(
-		(relativePath: string | null | undefined, options?: { create?: boolean; content?: string; line?: number }) => {
-			if (!project || !relativePath) {
-				return
-			}
-			const normalizedPath = `${String(project.rootPath).replace(/[\\/]$/, "")}/${relativePath}`.replace(
-				/\//g,
-				"\\",
-			)
-			vscode.postMessage({
-				type: "openFile",
-				text: normalizedPath,
-				values: options,
-			})
-		},
-		[project],
-	)
-
-	const focusSummary = useMemo(() => {
+	const headerSummary = useMemo(() => {
 		if (!manuscript?.exists) {
-			return "Open the manuscript and start drafting in the editor."
+			return "Main manuscript is not ready yet."
 		}
-		if (editorContext?.onPrimaryManuscript && manuscript?.currentHeading) {
-			return `You are working inside ${manuscript.currentHeading}.`
+		if (editorContext?.onPrimaryManuscript && editorContext?.hasSelection) {
+			return "A passage is selected in the manuscript."
 		}
-		if (editorContext?.onPrimaryManuscript) {
-			return "You are in the main manuscript."
+		if ((missing?.length ?? 0) > 0 || (manuscript?.citationPlaceholderCount ?? 0) > 0) {
+			return "The current draft still has citation gaps."
 		}
-		return "Open main.tex to continue the paper in context."
-	}, [editorContext?.onPrimaryManuscript, manuscript?.currentHeading, manuscript?.exists])
+		if (!manuscript?.hasPdf) {
+			return "Build a fresh PDF to inspect layout and references."
+		}
+		return "The draft is ready for the next writing or revision pass."
+	}, [
+		editorContext?.hasSelection,
+		editorContext?.onPrimaryManuscript,
+		manuscript?.citationPlaceholderCount,
+		manuscript?.exists,
+		manuscript?.hasPdf,
+		missing?.length,
+	])
+
+	const currentDraftStatus = useMemo(
+		() => [
+			{ label: "Words", value: `${manuscript?.wordCount ?? 0}` },
+			{ label: "Status", value: formatManuscriptStatus(manuscript?.status) },
+			{ label: "Heading", value: manuscript?.currentHeading ?? "No active heading" },
+			{
+				label: "Last edited",
+				value: manuscript?.lastEdited ? new Date(manuscript.lastEdited).toLocaleString() : "Not yet",
+			},
+			{ label: "Missing cites", value: `${missing?.length ?? 0}` },
+			{ label: "Placeholders", value: `${manuscript?.citationPlaceholderCount ?? 0}` },
+		],
+		[
+			manuscript?.citationPlaceholderCount,
+			manuscript?.currentHeading,
+			manuscript?.lastEdited,
+			manuscript?.status,
+			manuscript?.wordCount,
+			missing?.length,
+		],
+	)
+
+	const nextStep = useMemo(() => {
+		const openMain: NextStepAction = {
+			label: "Open main.tex",
+			onClick: () => openProjectFile(project?.primaryManuscriptPath),
+		}
+		const openPipeline: NextStepAction = { label: "Open Research Pipeline", onClick: onOpenResearchPipeline }
+		const buildPdf: NextStepAction = {
+			label: "Build PDF",
+			onClick: () => handleWorkspaceCommand("paperBuildManuscript"),
+		}
+		const viewPdf: NextStepAction = {
+			label: "View PDF",
+			onClick: () => handleWorkspaceCommand("paperViewPdf"),
+			disabled: !manuscript?.hasPdf,
+		}
+		const openReferences: NextStepAction = {
+			label: "Open references",
+			onClick: () => setSideTab("references"),
+		}
+		const createSnapshot: NextStepAction = { label: "Create snapshot", onClick: handleCreateSnapshot }
+
+		if (!manuscript?.exists) {
+			return {
+				title: "Set up the draft entry",
+				description:
+					"The main manuscript is not ready yet. Open or regenerate the draft entry before continuing.",
+				primary: openMain,
+				secondary: openPipeline,
+			}
+		}
+
+		if (!editorContext?.onPrimaryManuscript) {
+			return {
+				title: "Return to the manuscript",
+				description:
+					"Open the main manuscript so writing actions, heading context, and draft status all stay aligned.",
+				primary: openMain,
+				secondary: viewPdf,
+			}
+		}
+
+		if (editorContext?.hasSelection) {
+			return {
+				title: "Refine the selected passage",
+				description:
+					"A passage is selected in the manuscript. Tighten the wording now, or keep drafting if the phrasing already feels stable.",
+				primary: { label: "Use Selection Assistant", onClick: focusSelectionAssistant },
+				secondary: openMain,
+			}
+		}
+
+		if ((missing?.length ?? 0) > 0 || (manuscript?.citationPlaceholderCount ?? 0) > 0) {
+			return {
+				title: "Resolve citation gaps",
+				description:
+					"The draft still has citation gaps. Resolve them before the next polish or submission pass.",
+				primary: { label: "Scan citations", onClick: handleScanCitations },
+				secondary: openReferences,
+			}
+		}
+
+		if (!manuscript?.hasPdf) {
+			return {
+				title: "Build the current draft",
+				description: "Build the manuscript to inspect layout, references, and section flow in PDF form.",
+				primary: buildPdf,
+				secondary: viewPdf,
+			}
+		}
+
+		if (["revising", "final", "submitted"].includes(project?.stage ?? "") && !assets?.revisionLog?.exists) {
+			return {
+				title: "Prepare revision tracking",
+				description:
+					"This project is in a revision-oriented stage, but the revision log is missing. Create it before large changes.",
+				primary: { label: "Create revision log", onClick: handleSeedRevisionLog },
+				secondary: createSnapshot,
+			}
+		}
+
+		if (gitStatus?.available && gitStatus.hasChanges && snapshots.length === 0) {
+			return {
+				title: "Protect the current draft",
+				description:
+					"You have active draft changes. Save a snapshot before the next structural pass or reviewer-facing revision.",
+				primary: createSnapshot,
+				secondary: {
+					label: "Open Source Control",
+					onClick: () => handleWorkspaceCommand("paperOpenSourceControl"),
+				},
+			}
+		}
+
+		return {
+			title: "Continue the stable writing pass",
+			description: recommendedAction,
+			primary: openMain,
+			secondary: buildPdf,
+		}
+	}, [
+		assets?.revisionLog?.exists,
+		editorContext?.hasSelection,
+		editorContext?.onPrimaryManuscript,
+		focusSelectionAssistant,
+		gitStatus?.available,
+		gitStatus?.hasChanges,
+		handleCreateSnapshot,
+		handleScanCitations,
+		handleSeedRevisionLog,
+		handleWorkspaceCommand,
+		manuscript?.citationPlaceholderCount,
+		manuscript?.exists,
+		manuscript?.hasPdf,
+		missing?.length,
+		onOpenResearchPipeline,
+		openProjectFile,
+		project?.primaryManuscriptPath,
+		project?.stage,
+		recommendedAction,
+		snapshots.length,
+	])
+
+	const selectionContext = useMemo(() => {
+		if (!editorContext?.onPrimaryManuscript) {
+			return "Open the main manuscript to use writing actions in context."
+		}
+		if (!editorContext?.hasSelection) {
+			return "Select a passage in main.tex to enable writing actions."
+		}
+		return `${editorContext.selectionWordCount ?? 0} words selected in ${truncatePath(editorContext.filePath ?? "main.tex")}`
+	}, [
+		editorContext?.filePath,
+		editorContext?.hasSelection,
+		editorContext?.onPrimaryManuscript,
+		editorContext?.selectionWordCount,
+	])
+
+	const safetyItems = useMemo<Array<{ label: string; value: string; tone: MetricTone }>>(
+		() => [
+			{
+				label: "Git",
+				value: gitStatus?.available
+					? gitStatus.hasChanges
+						? `${gitStatus.changedFiles} changed`
+						: "Clean"
+					: "Unavailable",
+				tone: gitStatus?.available ? (gitStatus.hasChanges ? "warning" : "ready") : "neutral",
+			},
+			{
+				label: "PDF",
+				value: manuscript?.hasPdf ? "Ready" : "Not built",
+				tone: manuscript?.hasPdf ? "ready" : "warning",
+			},
+			{
+				label: "Snapshot",
+				value: snapshots.length > 0 ? `${snapshots.length} saved` : "Missing",
+				tone: snapshots.length > 0 ? "ready" : "warning",
+			},
+		],
+		[gitStatus?.available, gitStatus?.changedFiles, gitStatus?.hasChanges, manuscript?.hasPdf, snapshots.length],
+	)
+
+	const blockingChecks = useMemo(() => checks.filter((check: any) => check.severity === "warning"), [checks])
+	const reviewChecks = useMemo(() => checks.filter((check: any) => check.severity === "info"), [checks])
 
 	if (loading && !paperProjectState) {
 		return (
@@ -229,39 +449,89 @@ const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone, onOpenResea
 	}
 
 	return (
-		<div className="flex h-full flex-col">
+		<div className="flex h-full flex-col bg-[radial-gradient(circle_at_top_left,rgba(228,239,255,0.12),transparent_26%),linear-gradient(180deg,transparent,rgba(255,255,255,0.015))]">
 			<div className="flex items-center gap-2 border-b px-4 py-3 shrink-0">
 				<Button variant="ghost" size="icon" onClick={onDone}>
 					<ArrowLeft className="h-4 w-4" />
 				</Button>
 				<FileText className="h-5 w-5" />
-				<h3 className="text-lg font-semibold">Paper Writing</h3>
+				<div className="min-w-0">
+					<h3 className="truncate text-lg font-semibold">Paper Writing</h3>
+					{project && <p className="truncate text-xs text-muted-foreground">{headerSummary}</p>}
+				</div>
 				{project && (
-					<>
-						<span className="rounded bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
+					<div className="ml-auto flex flex-wrap items-center gap-2">
+						<span className="rounded-full border bg-background/80 px-2.5 py-1 text-[11px] text-muted-foreground">
 							{project.templateId}
 						</span>
-						<span className="text-xs text-muted-foreground">{project.name}</span>
-					</>
-				)}
-				<div className="ml-auto flex items-center gap-2">
-					{project && (
-						<Button variant="outline" size="sm" onClick={handleRefreshProject}>
-							<RefreshCcw className="mr-1.5 h-3.5 w-3.5" />
-							{refreshing ? "Refreshing..." : "Refresh"}
+						<label className="flex items-center gap-2 rounded-full border bg-background/80 px-3 py-1.5 text-[11px] text-muted-foreground">
+							<span>Stage</span>
+							<select
+								value={project.stage}
+								onChange={(event) => handleStageChange(event.target.value)}
+								className="bg-transparent text-foreground outline-none">
+								{STAGE_OPTIONS.map((stage) => (
+									<option key={stage.id} value={stage.id}>
+										{stage.label}
+									</option>
+								))}
+							</select>
+						</label>
+						<Button
+							variant="primary"
+							size="sm"
+							onClick={() => openProjectFile(project.primaryManuscriptPath)}>
+							Open main.tex
 						</Button>
-					)}
-				</div>
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => handleWorkspaceCommand("paperBuildManuscript")}>
+							<Play className="mr-1.5 h-3.5 w-3.5" />
+							Build PDF
+						</Button>
+						<Button
+							variant="outline"
+							size="sm"
+							disabled={!manuscript?.hasPdf}
+							onClick={() => handleWorkspaceCommand("paperViewPdf")}>
+							<Eye className="mr-1.5 h-3.5 w-3.5" />
+							View PDF
+						</Button>
+						<DropdownMenu>
+							<DropdownMenuTrigger asChild>
+								<Button variant="ghost" size="icon" title="More actions">
+									<Ellipsis className="h-4 w-4" />
+								</Button>
+							</DropdownMenuTrigger>
+							<DropdownMenuContent align="end">
+								<DropdownMenuItem
+									onClick={() =>
+										openProjectFile("latex/references.bib", { create: true, content: "" })
+									}>
+									Open references.bib
+								</DropdownMenuItem>
+								<DropdownMenuItem onClick={() => handleWorkspaceCommand("paperOpenSourceControl")}>
+									Open Source Control
+								</DropdownMenuItem>
+								<DropdownMenuItem onClick={handleCreateSnapshot}>Create snapshot</DropdownMenuItem>
+								<DropdownMenuItem onClick={handleGenerateBib}>Generate bibliography</DropdownMenuItem>
+								<DropdownMenuSeparator />
+								<DropdownMenuItem onClick={handleRefreshProject}>Refresh</DropdownMenuItem>
+							</DropdownMenuContent>
+						</DropdownMenu>
+					</div>
+				)}
 			</div>
 
 			{!project ? (
 				<div className="flex flex-1 items-center justify-center p-6">
-					<div className="max-w-lg rounded-2xl border bg-card p-6 text-center">
+					<div className="max-w-lg rounded-[28px] border bg-card p-6 text-center shadow-[0_18px_50px_rgba(0,0,0,0.12)]">
 						<FileText className="mx-auto h-10 w-10 text-primary opacity-80" />
 						<h4 className="mt-4 text-base font-semibold">No paper project is active</h4>
 						<p className="mt-2 text-sm text-muted-foreground">
 							Create or open your research project from the Research Pipeline panel, then come back here
-							to write, build, and review the manuscript.
+							to continue manuscript writing.
 						</p>
 						<div className="mt-5 flex justify-center">
 							<Button variant="primary" size="sm" onClick={onOpenResearchPipeline}>
@@ -271,485 +541,300 @@ const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone, onOpenResea
 					</div>
 				</div>
 			) : (
-				<div className="flex min-h-0 flex-1">
-					<div className="flex min-h-0 flex-1 flex-col">
-						<div className="border-b bg-background/95 px-4 py-3">
-							<div className="flex flex-wrap items-start gap-3">
-								<div className="min-w-0 flex-1">
-									<div className="flex flex-wrap items-center gap-2">
-										<h4 className="truncate text-sm font-semibold">{project.name}</h4>
-										<span className="rounded-full border px-2 py-0.5 text-[10px] text-muted-foreground">
-											{project.templateId}
-										</span>
-									</div>
-									<div className="mt-2 flex flex-wrap items-center gap-2">
-										<StatusPill label={`${manuscript?.wordCount ?? 0} words`} />
-										<StatusPill
-											label={`${missing?.length ?? 0} missing cites`}
-											tone={(missing?.length ?? 0) > 0 ? "warning" : "neutral"}
-										/>
-										{(manuscript?.citationPlaceholderCount ?? 0) > 0 && (
-											<StatusPill
-												label={`${manuscript?.citationPlaceholderCount ?? 0} placeholders`}
-												tone="warning"
-											/>
-										)}
-										{gitStatus?.available && <StatusPill label={gitStatus.branch ?? "detached"} />}
-										{gitStatus?.available && gitStatus.hasChanges && (
-											<StatusPill label={`${gitStatus.changedFiles} changed`} tone="warning" />
-										)}
-									</div>
+				<div className="grid min-h-0 flex-1 gap-4 overflow-hidden px-4 py-4 xl:grid-cols-[1.35fr_0.95fr]">
+					<div className="min-h-0 overflow-auto pr-1">
+						<div className="space-y-4">
+							<FocusCard
+								title="Current Draft"
+								subtitle="The manuscript health snapshot for this writing pass.">
+								<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+									{currentDraftStatus.map((item) => (
+										<MetricTile key={item.label} label={item.label} value={item.value} />
+									))}
 								</div>
-								<div className="flex flex-wrap items-center gap-2">
-									<label className="flex items-center gap-2 rounded-full border bg-background px-3 py-1.5 text-[11px] text-muted-foreground">
-										<span>Stage</span>
-										<select
-											value={project.stage}
-											onChange={(event) => handleStageChange(event.target.value)}
-											className="bg-transparent text-foreground outline-none">
-											{STAGE_OPTIONS.map((stage) => (
-												<option key={stage.id} value={stage.id}>
-													{stage.label}
-												</option>
-											))}
-										</select>
-									</label>
-									<Button
-										variant="primary"
-										size="sm"
-										onClick={() => openProjectFile(project.primaryManuscriptPath)}>
-										Continue writing
-									</Button>
-									<Button
-										variant="outline"
-										size="sm"
-										onClick={() => handleWorkspaceCommand("paperBuildManuscript")}>
-										<Play className="mr-1.5 h-3.5 w-3.5" />
-										Build PDF
-									</Button>
-									<Button
-										variant="outline"
-										size="sm"
-										onClick={() => handleWorkspaceCommand("paperViewPdf")}>
-										<Eye className="mr-1.5 h-3.5 w-3.5" />
-										View PDF
-									</Button>
-									<Button
-										variant="ghost"
-										size="sm"
-										onClick={() => setSidePanelOpen((open) => !open)}
-										title={sidePanelOpen ? "Hide side panel" : "Show side panel"}>
-										{sidePanelOpen ? (
-											<PanelRightClose className="h-4 w-4" />
-										) : (
-											<PanelRightOpen className="h-4 w-4" />
-										)}
-									</Button>
-								</div>
-							</div>
-							<div className="mt-3 rounded-xl border bg-muted/25 px-3 py-2">
-								<div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-									Today
-								</div>
-								<div className="mt-1 text-sm text-foreground">{recommendedAction}</div>
-							</div>
-						</div>
+							</FocusCard>
 
-						<div className="grid flex-1 gap-4 overflow-auto px-4 py-4 lg:grid-cols-[1.3fr_1fr]">
-							<div className="space-y-4">
-								<section className="rounded-2xl border bg-card p-4">
-									<div className="flex items-start justify-between gap-3">
-										<div>
-											<div className="flex items-center gap-2">
-												<ScrollText className="h-4 w-4 text-primary" />
-												<h5 className="text-sm font-semibold">Writing focus</h5>
-											</div>
-											<p className="mt-1 text-sm text-muted-foreground">{focusSummary}</p>
-										</div>
-										<span className="rounded bg-muted px-2 py-1 text-[11px] text-muted-foreground">
-											{project.primaryManuscriptPath}
-										</span>
-									</div>
-									<div className="mt-4 rounded-2xl border bg-background/70 p-4">
-										<div className="flex flex-wrap items-center gap-2">
-											<StatusPill label={`${manuscript?.wordCount ?? 0} words`} />
-											<StatusPill label={formatManuscriptStatus(manuscript?.status)} />
-											{(missing?.length ?? 0) > 0 && (
-												<StatusPill
-													label={`${missing?.length ?? 0} missing cites`}
-													tone="warning"
-												/>
-											)}
-											{(manuscript?.citationPlaceholderCount ?? 0) > 0 && (
-												<StatusPill
-													label={`${manuscript?.citationPlaceholderCount ?? 0} placeholders`}
-													tone="warning"
-												/>
-											)}
-											{manuscript?.hasPdf && <StatusPill label="PDF ready" tone="ready" />}
-											{manuscript?.currentHeading && (
-												<StatusPill label={manuscript.currentHeading} />
-											)}
-										</div>
-										<div className="mt-3 rounded-xl border bg-muted/30 px-3 py-2">
-											<div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-												What to do now
-											</div>
-											<p className="mt-1 text-sm text-foreground">{recommendedAction}</p>
-										</div>
-										<p className="mt-2 text-xs text-muted-foreground">
-											Last edited:{" "}
-											{manuscript?.lastEdited
-												? new Date(manuscript.lastEdited).toLocaleString()
-												: "Not yet"}
-										</p>
-									</div>
+							<FocusCard title="Next Step" subtitle={nextStep.title}>
+								<div className="rounded-2xl border bg-background/80 px-4 py-3">
+									<p className="text-sm text-foreground">{nextStep.description}</p>
 									<div className="mt-4 flex flex-wrap gap-2">
 										<Button
 											variant="primary"
 											size="sm"
-											onClick={() => openProjectFile(project.primaryManuscriptPath)}>
-											Open main.tex
+											onClick={nextStep.primary.onClick}
+											disabled={nextStep.primary.disabled}>
+											{nextStep.primary.label}
 										</Button>
 										<Button
 											variant="outline"
 											size="sm"
-											onClick={() => handleWorkspaceCommand("paperBuildManuscript")}>
-											Build with LaTeX Workshop
-										</Button>
-										<Button
-											variant="outline"
-											size="sm"
-											onClick={() => handleWorkspaceCommand("paperViewPdf")}>
-											Open PDF preview
-										</Button>
-										<Button
-											variant="outline"
-											size="sm"
-											onClick={() =>
-												openProjectFile("latex/references.bib", { create: true, content: "" })
-											}>
-											Open references.bib
-										</Button>
-										<Button
-											variant="outline"
-											size="sm"
-											onClick={() => handleWorkspaceCommand("paperOpenSourceControl")}>
-											Open Source Control
-										</Button>
-										<Button variant="ghost" size="sm" onClick={handleScanCitations}>
-											Scan citations
-										</Button>
-										<Button variant="ghost" size="sm" onClick={handleGenerateBib}>
-											Generate bib
-										</Button>
-										<Button variant="ghost" size="sm" onClick={handleCreateSnapshot}>
-											Snapshot
+											onClick={nextStep.secondary.onClick}
+											disabled={nextStep.secondary.disabled}>
+											{nextStep.secondary.label}
 										</Button>
 									</div>
-								</section>
+								</div>
+							</FocusCard>
 
-								<section className="rounded-2xl border bg-card p-4">
-									<div className="flex items-center gap-2">
-										<Sparkles className="h-4 w-4 text-primary" />
-										<h5 className="text-sm font-semibold">Selection assistant</h5>
+							<FocusCard
+								title="Selection Assistant"
+								subtitle="Use targeted writing actions on the passage currently selected in the editor."
+								highlight={highlightSelectionAssistant}
+								ref={selectionAssistantRef}>
+								<div className="rounded-2xl border bg-background/75 px-4 py-3">
+									<div className="flex flex-wrap items-center gap-2">
+										<StatusPill
+											label={
+												editorContext?.onPrimaryManuscript
+													? "In main manuscript"
+													: "Out of manuscript context"
+											}
+											tone={editorContext?.onPrimaryManuscript ? "ready" : "neutral"}
+										/>
+										<StatusPill
+											label={editorContext?.hasSelection ? "Selection ready" : "No selection"}
+											tone={editorContext?.hasSelection ? "ready" : "warning"}
+										/>
+										{editorContext?.filePath && (
+											<StatusPill label={truncatePath(editorContext.filePath)} />
+										)}
 									</div>
-									<p className="mt-1 text-sm text-muted-foreground">
-										Sci-Roo only touches the passage you have selected in the editor. Use these
-										buttons or the VS Code right-click menu while drafting in `main.tex`.
-									</p>
-									<div className="mt-3 flex flex-wrap gap-2">
-										{TEXT_ACTIONS.map((action) => (
-											<Button
-												key={action.command}
-												variant="outline"
-												size="sm"
-												disabled={!canRunSelectionActions}
-												onClick={() =>
-													handleWorkspaceCommand(
-														action.command as
-															| "paperRewriteSelection"
-															| "paperRephraseSelection"
-															| "paperMakeConciseSelection"
-															| "paperMakeAcademicSelection"
-															| "paperExpandAcademicParagraph"
-															| "paperAddCitationPlaceholder"
-															| "paperTranslateSelectionChinese"
-															| "paperTranslateSelectionEnglish",
-													)
-												}>
-												{action.label}
-											</Button>
-										))}
-									</div>
-									{!canRunSelectionActions && (
-										<p className="mt-2 text-xs text-muted-foreground">
-											Select a passage in the editor first, then use these actions or the
-											right-click menu.
-										</p>
-									)}
-									<div className="mt-4 rounded-xl border bg-muted/30 p-3 text-sm">
-										<div className="flex items-center gap-2 text-foreground">
-											<CheckCircle2 className="h-4 w-4 text-emerald-500" />
-											<span className="font-medium">Editor status</span>
+									<p className="mt-3 text-sm text-muted-foreground">{selectionContext}</p>
+								</div>
+								<div className="mt-4 space-y-3">
+									{SELECTION_ACTION_GROUPS.map((group) => (
+										<div key={group.label}>
+											<div className="mb-2 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+												{group.label}
+											</div>
+											<div className="flex flex-wrap gap-2">
+												{group.actions.map((action) => (
+													<Button
+														key={action.command}
+														variant="outline"
+														size="sm"
+														disabled={!editorContext?.hasSelection}
+														onClick={() =>
+															handleWorkspaceCommand(
+																action.command as
+																	| "paperRewriteSelection"
+																	| "paperRephraseSelection"
+																	| "paperMakeConciseSelection"
+																	| "paperMakeAcademicSelection"
+																	| "paperExpandAcademicParagraph"
+																	| "paperAddCitationPlaceholder"
+																	| "paperTranslateSelectionChinese"
+																	| "paperTranslateSelectionEnglish",
+															)
+														}>
+														{action.label}
+													</Button>
+												))}
+											</div>
 										</div>
-										<div className="mt-2 flex flex-wrap gap-2 text-muted-foreground">
-											<StatusPill
-												label={
-													editorContext?.hasSelection
-														? `${editorContext.selectionWordCount} words selected`
-														: "No selection"
-												}
-												tone={editorContext?.hasSelection ? "ready" : "neutral"}
+									))}
+								</div>
+							</FocusCard>
+
+							<FocusCard
+								title="Draft Safety"
+								subtitle="Keep the current writing pass recoverable and reviewable.">
+								<div className="grid gap-3 sm:grid-cols-3">
+									{safetyItems.map((item) => (
+										<MetricTile
+											key={item.label}
+											label={item.label}
+											value={item.value}
+											tone={item.tone}
+										/>
+									))}
+								</div>
+								<div className="mt-4 flex flex-wrap gap-2">
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={() => handleWorkspaceCommand("paperOpenSourceControl")}>
+										Open Source Control
+									</Button>
+									<Button variant="outline" size="sm" onClick={handleCreateSnapshot}>
+										Create snapshot
+									</Button>
+								</div>
+							</FocusCard>
+						</div>
+					</div>
+
+					<div className="flex min-h-0 flex-col rounded-[28px] border bg-card shadow-[0_18px_40px_rgba(0,0,0,0.08)]">
+						<div className="border-b px-2 py-2">
+							<div className="flex gap-1">
+								{[
+									{ id: "references", label: "References", icon: Library },
+									{ id: "outline", label: "Outline", icon: ScrollText },
+									{ id: "checks", label: "Checks", icon: AlertTriangle },
+								].map((tab) => {
+									const Icon = tab.icon
+									const active = sideTab === tab.id
+									return (
+										<button
+											key={tab.id}
+											type="button"
+											onClick={() => setSideTab(tab.id as SideTab)}
+											className={`flex flex-1 items-center justify-center gap-1 rounded-xl px-2 py-1.5 text-[11px] transition-colors ${
+												active
+													? "bg-foreground text-background"
+													: "text-muted-foreground hover:bg-muted"
+											}`}>
+											<Icon className="h-3.5 w-3.5" />
+											<span>{tab.label}</span>
+										</button>
+									)
+								})}
+							</div>
+						</div>
+
+						<div className="min-h-0 flex-1 overflow-auto">
+							{sideTab === "references" && (
+								<ReferencePanel
+									referenceEntries={referenceEntries}
+									uncatalogued={uncatalogued}
+									cited={cited}
+									missing={missing}
+									citationPlaceholderCount={manuscript?.citationPlaceholderCount ?? 0}
+									bibGenerated={bibGenerated}
+									bibPreview={bibPreview}
+									selectedSection={null}
+									sectionContent=""
+									sectionInsight={null}
+									embedded
+								/>
+							)}
+
+							{sideTab === "outline" && (
+								<div className="space-y-4 p-4">
+									<SupportSection
+										title="Manuscript outline"
+										description="Jump to the active section structure in main.tex.">
+										{outline.length > 0 ? (
+											<div className="space-y-1">
+												{outline.map((item) => (
+													<button
+														key={item.id}
+														type="button"
+														onClick={() =>
+															openProjectFile(project.primaryManuscriptPath, {
+																line: item.line,
+															})
+														}
+														className={`flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-background/70 ${
+															manuscript?.currentHeading === item.title
+																? "bg-background/85 text-foreground"
+																: "text-muted-foreground"
+														}`}>
+														<span
+															className={`truncate text-sm ${
+																item.level === 2
+																	? "pl-3"
+																	: item.level === 3
+																		? "pl-6"
+																		: ""
+															}`}>
+															{item.title}
+														</span>
+														<span className="ml-3 text-[10px]">L{item.line}</span>
+													</button>
+												))}
+											</div>
+										) : (
+											<p className="text-sm text-muted-foreground">
+												No section headings have been detected in `main.tex` yet.
+											</p>
+										)}
+									</SupportSection>
+
+									<SupportSection
+										title="Quick files"
+										description="Open the planning and revision files that most often support manuscript work.">
+										<div className="space-y-2">
+											<AssetButton
+												label="Open paper plan"
+												onClick={() => openProjectFile("task/paper-plan.md")}
 											/>
-											<StatusPill
-												label={
-													editorContext?.onPrimaryManuscript
-														? "In main manuscript"
-														: editorContext?.inProject
-															? "Inside project"
-															: "Out of context"
-												}
-												tone={editorContext?.onPrimaryManuscript ? "ready" : "neutral"}
+											<AssetButton
+												label="Open research questions"
+												onClick={() => openProjectFile("problem/research-questions.md")}
 											/>
-											{editorContext?.filePath && (
-												<StatusPill label={truncatePath(editorContext.filePath)} />
+											{!assets?.revisionLog?.exists ? (
+												<AssetButton
+													label="Create revision log"
+													onClick={handleSeedRevisionLog}
+												/>
+											) : (
+												<AssetButton
+													label="Open revision log"
+													onClick={() => openProjectFile("review/revision-log.md")}
+												/>
 											)}
 										</div>
-									</div>
-								</section>
+									</SupportSection>
+								</div>
+							)}
 
-								<section className="rounded-2xl border bg-card p-4">
-									<div className="flex items-center gap-2">
-										<GitBranch className="h-4 w-4 text-primary" />
-										<h5 className="text-sm font-semibold">Checkpoint</h5>
-									</div>
-									{gitStatus?.available ? (
-										<div className="mt-3 grid gap-3 sm:grid-cols-2">
-											<WorkflowCard
-												icon={<GitBranch className="h-4 w-4 text-primary" />}
-												title={gitStatus.branch ? `On ${gitStatus.branch}` : "Git ready"}
-												body={
-													gitStatus.hasChanges
-														? `${gitStatus.changedFiles} file(s) changed. Review Source Control when this writing pass feels stable.`
-														: "Working tree is clean. Good time to start the next drafting or revision pass."
+							{sideTab === "checks" && (
+								<div className="space-y-4 p-4">
+									<SupportSection
+										title="Blocking"
+										description="Issues that are actively weakening the current writing pass.">
+										<div className="space-y-2">
+											{blockingChecks.length > 0 ? (
+												blockingChecks.map((check: any) => (
+													<CheckNotice key={check.id} label={check.label} tone="warning" />
+												))
+											) : (
+												<CheckNotice
+													label="No blocking issues are flagged right now."
+													tone="ready"
+												/>
+											)}
+										</div>
+									</SupportSection>
+
+									<SupportSection
+										title="Needs Review"
+										description="Useful follow-up items that are not hard blockers yet.">
+										<div className="space-y-2">
+											{reviewChecks.length > 0 ? (
+												reviewChecks.map((check: any) => (
+													<CheckNotice key={check.id} label={check.label} tone="neutral" />
+												))
+											) : (
+												<CheckNotice
+													label="The current draft looks reasonably stable for this pass."
+													tone="ready"
+												/>
+											)}
+										</div>
+									</SupportSection>
+
+									<SupportSection
+										title="Assets Status"
+										description="Check whether the supporting planning and revision files are ready.">
+										<div className="space-y-2">
+											<AssetStatusRow label="Paper plan" ready={!!assets?.paperPlanReady} />
+											<AssetStatusRow
+												label="Research questions"
+												ready={!!assets?.researchQuestionsReady}
+											/>
+											<AssetStatusRow
+												label="Revision log"
+												ready={!!assets?.revisionLog?.exists}
+												trailing={
+													assets?.revisionLog?.exists
+														? `${assets.revisionLog.openItems + assets.revisionLog.checklistOpen} open`
+														: "Missing"
 												}
 											/>
-											<WorkflowCard
-												icon={<FileText className="h-4 w-4 text-primary" />}
-												title="Build status"
-												body={
-													manuscript?.hasPdf
-														? `${quickWorkspaceSummary}. ${cited?.length ?? 0} cite key(s) detected.`
-														: quickWorkspaceSummary
-												}
-											/>
 										</div>
-									) : (
-										<div className="mt-3 grid gap-3 sm:grid-cols-2">
-											<WorkflowCard
-												icon={<FileText className="h-4 w-4 text-primary" />}
-												title="LaTeX Workshop first"
-												body="Write, compile, and preview in the native editor flow. Sci-Roo stays out of the way and helps only when you ask."
-											/>
-											<WorkflowCard
-												icon={<GitBranch className="h-4 w-4 text-primary" />}
-												title="Git-friendly checkpoints"
-												body="Initialize git in this project to make revision checkpoints and source-control review part of the writing flow."
-											/>
-										</div>
-									)}
-								</section>
-							</div>
-
-							{sidePanelOpen && (
-								<div className="flex min-h-0 flex-col rounded-2xl border bg-card">
-									<div className="border-b px-2 py-2">
-										<div className="flex gap-1">
-											{[
-												{ id: "references", label: "References", icon: Library },
-												{ id: "outline", label: "Outline", icon: ScrollText },
-												{ id: "checks", label: "Checks", icon: AlertTriangle },
-											].map((tab) => {
-												const Icon = tab.icon
-												const active = sideTab === tab.id
-												return (
-													<button
-														key={tab.id}
-														type="button"
-														onClick={() => setSideTab(tab.id as SideTab)}
-														className={`flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-[11px] transition-colors ${
-															active
-																? "bg-foreground text-background"
-																: "text-muted-foreground hover:bg-muted"
-														}`}>
-														<Icon className="h-3.5 w-3.5" />
-														<span>{tab.label}</span>
-													</button>
-												)
-											})}
-										</div>
-									</div>
-									<div className="min-h-0 flex-1 overflow-auto">
-										{sideTab === "references" && (
-											<ReferencePanel
-												referenceEntries={referenceEntries}
-												uncatalogued={uncatalogued}
-												cited={cited}
-												missing={missing}
-												citationPlaceholderCount={manuscript?.citationPlaceholderCount ?? 0}
-												bibGenerated={bibGenerated}
-												bibPreview={bibPreview}
-												selectedSection={null}
-												sectionContent=""
-												sectionInsight={null}
-												embedded
-											/>
-										)}
-										{sideTab === "outline" && (
-											<div className="space-y-3 p-4 text-sm">
-												<div className="rounded-xl border bg-muted/20 p-3">
-													<h6 className="font-medium">Manuscript outline</h6>
-													{outline.length > 0 ? (
-														<div className="mt-2 space-y-1">
-															{outline.map((item: OutlineItem) => (
-																<button
-																	key={item.id}
-																	type="button"
-																	onClick={() =>
-																		openProjectFile(project.primaryManuscriptPath, {
-																			line: item.line,
-																		})
-																	}
-																	className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-background/70 ${
-																		manuscript?.currentHeading === item.title
-																			? "bg-background/80 text-foreground"
-																			: "text-muted-foreground"
-																	}`}>
-																	<span
-																		className={`truncate ${item.level === 2 ? "pl-3" : item.level === 3 ? "pl-6" : ""}`}>
-																		{item.title}
-																	</span>
-																	<span className="ml-3 text-[10px]">
-																		L{item.line}
-																	</span>
-																</button>
-															))}
-														</div>
-													) : (
-														<p className="mt-2 text-muted-foreground">
-															No section headings found in `main.tex` yet.
-														</p>
-													)}
-												</div>
-												<div className="rounded-xl border bg-muted/20 p-3">
-													<h6 className="font-medium">Quick files</h6>
-													<div className="mt-2 space-y-2">
-														<AssetButton
-															label="Open paper plan"
-															onClick={() => openProjectFile("task/paper-plan.md")}
-														/>
-														<AssetButton
-															label="Open research questions"
-															onClick={() =>
-																openProjectFile("problem/research-questions.md")
-															}
-														/>
-														{!assets?.revisionLog?.exists && (
-															<AssetButton
-																label="Create revision log template"
-																onClick={handleSeedRevisionLog}
-															/>
-														)}
-														<AssetButton
-															label="Open revision log"
-															onClick={() => openProjectFile("review/revision-log.md")}
-														/>
-														<AssetButton
-															label="Open references.bib"
-															onClick={() =>
-																openProjectFile("latex/references.bib", {
-																	create: true,
-																	content: "",
-																})
-															}
-														/>
-													</div>
-												</div>
-											</div>
-										)}
-										{sideTab === "checks" && (
-											<div className="space-y-4 p-4 text-sm">
-												<div className="rounded-xl border bg-muted/20 p-3">
-													<h6 className="font-medium">Needs attention</h6>
-													<div className="mt-2 space-y-2">
-														{warningChecks.map((check: any) => (
-															<div
-																key={check.id}
-																className="rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200">
-																{check.label}
-															</div>
-														))}
-														{warningChecks.length === 0 && (
-															<div className="rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-emerald-900 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-200">
-																No urgent blockers right now.
-															</div>
-														)}
-													</div>
-												</div>
-												<div className="rounded-xl border bg-muted/20 p-3">
-													<h6 className="font-medium">Keep an eye on</h6>
-													<div className="mt-2 space-y-2">
-														{infoChecks.map((check: any) => (
-															<div
-																key={check.id}
-																className="rounded-lg border bg-background/70 px-3 py-2 text-foreground">
-																{check.label}
-															</div>
-														))}
-														{infoChecks.length === 0 && readyChecks.length > 0 && (
-															<div className="rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-emerald-900 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-200">
-																{readyChecks[0].label}
-															</div>
-														)}
-													</div>
-												</div>
-												<div className="rounded-xl border bg-muted/20 p-3">
-													<h6 className="font-medium">Research assets</h6>
-													<div className="mt-2 space-y-2 text-muted-foreground">
-														<div className="flex items-center justify-between rounded-lg border bg-background/70 px-3 py-2">
-															<span>Paper plan</span>
-															<span>{assets?.paperPlanReady ? "Ready" : "Empty"}</span>
-														</div>
-														<div className="flex items-center justify-between rounded-lg border bg-background/70 px-3 py-2">
-															<span>Research questions</span>
-															<span>
-																{assets?.researchQuestionsReady ? "Ready" : "Empty"}
-															</span>
-														</div>
-														<div className="flex items-center justify-between rounded-lg border bg-background/70 px-3 py-2">
-															<span>Revision log</span>
-															<span>
-																{assets?.revisionLog?.exists
-																	? `${assets.revisionLog.openItems + assets.revisionLog.checklistOpen} open`
-																	: "Missing"}
-															</span>
-														</div>
-													</div>
-													{!assets?.revisionLog?.exists && (
-														<div className="mt-3">
-															<Button
-																variant="outline"
-																size="sm"
-																onClick={handleSeedRevisionLog}>
-																Create revision log
-															</Button>
-														</div>
-													)}
-												</div>
-											</div>
-										)}
-									</div>
+									</SupportSection>
 								</div>
 							)}
 						</div>
@@ -770,24 +855,93 @@ const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone, onOpenResea
 	)
 }
 
-const WorkflowCard = ({ icon, title, body }: { icon: React.ReactNode; title: string; body: string }) => (
-	<div className="rounded-xl border bg-background/70 p-3">
-		<div className="flex items-center gap-2">
-			{icon}
-			<h6 className="text-sm font-medium">{title}</h6>
+const FocusCard = React.forwardRef<
+	HTMLDivElement,
+	{ title: string; subtitle: string; children: React.ReactNode; highlight?: boolean }
+>(({ title, subtitle, children, highlight = false }, ref) => (
+	<section
+		ref={ref}
+		className={`rounded-[28px] border bg-card p-5 shadow-[0_18px_40px_rgba(0,0,0,0.08)] transition-colors ${
+			highlight ? "border-sky-400/80 shadow-[0_0_0_1px_rgba(56,189,248,0.35),0_18px_40px_rgba(0,0,0,0.08)]" : ""
+		}`}>
+		<div className="mb-4">
+			<p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">{title}</p>
+			<h5 className="mt-2 text-lg font-semibold">{subtitle}</h5>
 		</div>
-		<p className="mt-2 text-sm text-muted-foreground">{body}</p>
+		{children}
+	</section>
+))
+FocusCard.displayName = "FocusCard"
+
+const SupportSection = ({
+	title,
+	description,
+	children,
+}: {
+	title: string
+	description: string
+	children: React.ReactNode
+}) => (
+	<div className="rounded-2xl border bg-muted/15 p-3">
+		<div className="mb-3">
+			<div className="text-sm font-medium">{title}</div>
+			<p className="mt-1 text-xs text-muted-foreground">{description}</p>
+		</div>
+		{children}
 	</div>
 )
+
+const MetricTile = ({ label, value, tone = "neutral" }: { label: string; value: string; tone?: MetricTone }) => (
+	<div
+		className={`rounded-2xl border px-3 py-3 ${
+			tone === "warning"
+				? "border-amber-200 bg-amber-50/70 dark:border-amber-900/60 dark:bg-amber-950/20"
+				: tone === "ready"
+					? "border-emerald-200 bg-emerald-50/70 dark:border-emerald-900/60 dark:bg-emerald-950/20"
+					: "bg-background/80"
+		}`}>
+		<div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
+		<div className="mt-2 text-sm font-medium text-foreground">{value}</div>
+	</div>
+)
+
+type MetricTone = "neutral" | "warning" | "ready"
 
 const AssetButton = ({ label, onClick }: { label: string; onClick: () => void }) => (
 	<button
 		type="button"
 		onClick={onClick}
-		className="flex w-full items-center justify-between rounded-xl border bg-background/70 px-3 py-2 text-left transition-colors hover:bg-muted">
+		className="flex w-full items-center justify-between rounded-xl border bg-background/75 px-3 py-2 text-left text-sm transition-colors hover:bg-background">
 		<span>{label}</span>
 		<FolderOpen className="h-4 w-4 text-muted-foreground" />
 	</button>
+)
+
+const AssetStatusRow = ({ label, ready, trailing }: { label: string; ready: boolean; trailing?: string }) => (
+	<div className="flex items-center justify-between rounded-xl border bg-background/75 px-3 py-2 text-sm">
+		<div className="flex items-center gap-2">
+			{ready ? (
+				<CheckCircle2 className="h-4 w-4 text-emerald-600" />
+			) : (
+				<AlertTriangle className="h-4 w-4 text-amber-600" />
+			)}
+			<span>{label}</span>
+		</div>
+		<span className="text-xs text-muted-foreground">{trailing ?? (ready ? "Ready" : "Empty")}</span>
+	</div>
+)
+
+const CheckNotice = ({ label, tone }: { label: string; tone: "warning" | "ready" | "neutral" }) => (
+	<div
+		className={`rounded-xl border px-3 py-2 text-sm ${
+			tone === "warning"
+				? "border-amber-200 bg-amber-50/70 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200"
+				: tone === "ready"
+					? "border-emerald-200 bg-emerald-50/70 text-emerald-900 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-200"
+					: "bg-background/75 text-foreground"
+		}`}>
+		{label}
+	</div>
 )
 
 const StatusPill = ({ label, tone = "neutral" }: { label: string; tone?: "neutral" | "warning" | "ready" }) => (
@@ -803,18 +957,16 @@ const StatusPill = ({ label, tone = "neutral" }: { label: string; tone?: "neutra
 	</span>
 )
 
-function formatManuscriptStatus(status?: string | null): string {
+function formatManuscriptStatus(status: string | undefined): string {
 	switch (status) {
+		case "aligned":
+			return "Aligned"
+		case "active":
+			return "Active"
 		case "missing":
 			return "Missing"
-		case "empty":
-			return "Empty"
-		case "drafting":
-			return "Drafting"
-		case "ready-for-review":
-			return "Review-ready"
 		default:
-			return "Unknown"
+			return "Drafting"
 	}
 }
 
