@@ -1,3 +1,4 @@
+import { RETRIEVAL_SOURCES } from "@roo-code/types"
 import type OpenAI from "openai"
 
 export default {
@@ -5,7 +6,7 @@ export default {
 	function: {
 		name: "search_literature",
 		description:
-			"Search for academic papers across PubMed and arXiv. Use this tool to find scientific literature on a topic, discover recent papers, or gather references for a research project. Returns structured paper metadata including titles, authors, abstracts, and DOIs.",
+			"Search for academic papers across PubMed, arXiv, Semantic Scholar, Crossref, OpenAlex, DBLP, IEEE Xplore, and ACM Digital Library metadata. Use this tool to find scientific literature on a topic, discover recent papers, or gather references for a research project. Returns structured paper metadata including titles, authors, abstracts, and DOIs.",
 		strict: true,
 		parameters: {
 			type: "object",
@@ -13,13 +14,13 @@ export default {
 				query: {
 					type: "string",
 					description:
-						"The search query. Use Boolean operators (AND, OR, NOT) and field-specific terms for better results.",
+						"The executable academic database query in English. Translate non-English natural-language requests into English first; do not pass Chinese text directly. Use Boolean operators (AND, OR, NOT) and field-specific terms for better results.",
 				},
 				sources: {
 					type: "array",
 					items: {
 						type: "string",
-						enum: ["pubmed", "arxiv"],
+						enum: RETRIEVAL_SOURCES,
 					},
 					description:
 						"Which academic databases to search. Defaults to all available sources if not specified.",

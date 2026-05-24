@@ -51,10 +51,17 @@ import {
 	handleReadPaperArchiveRetrieval,
 	handleReadPaperConfirmRetrieval,
 	handleReadPaperCreateRetrieval,
+	handleReadPaperDeleteRetrieval,
+	handleReadPaperDeleteRetrievalWithImportedEntries,
+	handleReadPaperGetWorkspaceConfig,
 	handleReadPaperListRetrievals,
+	handleReadPaperImportCandidate,
+	handleReadPaperImportRetrieval,
 	handleReadPaperRunRetrieval,
 	handleReadPaperUpdateCandidate,
 	handleReadPaperUpdateRetrieval,
+	handleReadPaperResetWorkspaceConfig,
+	handleReadPaperUpdateWorkspaceConfig,
 } from "./readPaperMessageHandler"
 import { handleDataStudioRun, handleDataStudioList } from "./dataStudioMessageHandler"
 import { handleResearchPipelineRun, handleResearchPipelineList } from "./researchPipelineMessageHandler"
@@ -3101,6 +3108,18 @@ export const webviewMessageHandler = async (
 			await handleReadPaperListRetrievals(provider, message)
 			break
 		}
+		case "readPaperGetWorkspaceConfig": {
+			await handleReadPaperGetWorkspaceConfig(provider, message)
+			break
+		}
+		case "readPaperUpdateWorkspaceConfig": {
+			await handleReadPaperUpdateWorkspaceConfig(provider, message)
+			break
+		}
+		case "readPaperResetWorkspaceConfig": {
+			await handleReadPaperResetWorkspaceConfig(provider, message)
+			break
+		}
 		case "readPaperCreateRetrieval": {
 			await handleReadPaperCreateRetrieval(provider, message)
 			break
@@ -3123,6 +3142,22 @@ export const webviewMessageHandler = async (
 		}
 		case "readPaperArchiveRetrieval": {
 			await handleReadPaperArchiveRetrieval(provider, message)
+			break
+		}
+		case "readPaperDeleteRetrieval": {
+			await handleReadPaperDeleteRetrieval(provider, message)
+			break
+		}
+		case "readPaperDeleteRetrievalWithImportedEntries": {
+			await handleReadPaperDeleteRetrievalWithImportedEntries(provider, message)
+			break
+		}
+		case "readPaperImportCandidate": {
+			await handleReadPaperImportCandidate(provider, message)
+			break
+		}
+		case "readPaperImportRetrieval": {
+			await handleReadPaperImportRetrieval(provider, message)
 			break
 		}
 		case "dataStudioRun": {

@@ -1,6 +1,7 @@
 /**
  * Tool parameter type definitions for native protocol
  */
+import type { RetrievalSource } from "./retrieval.js"
 
 /**
  * Read mode for the read_file tool.
@@ -110,7 +111,7 @@ export interface GenerateImageParams {
 
 export interface SearchLiteratureParams {
 	query: string
-	sources?: ("pubmed" | "arxiv" | "semantic-scholar")[]
+	sources?: RetrievalSource[]
 	maxResults?: number
 	yearFrom?: number
 	yearTo?: number

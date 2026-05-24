@@ -1,7 +1,7 @@
 import { VSCodeLink } from "@vscode/webview-ui-toolkit/react"
 
 import { useRooCreditBalance } from "@/components/ui/hooks/useRooCreditBalance"
-import { useExtensionState } from "@src/context/ExtensionStateContext"
+import { useExtensionState } from "@/context/ExtensionStateContext"
 
 export const RooBalanceDisplay = () => {
 	const { data: balance } = useRooCreditBalance()

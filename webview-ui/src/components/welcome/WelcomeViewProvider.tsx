@@ -9,7 +9,7 @@ import {
 
 import type { ProviderSettings } from "@roo-code/types"
 
-import { useExtensionState } from "@src/context/ExtensionStateContext"
+import { useExtensionState } from "@/context/ExtensionStateContext"
 import { validateApiConfiguration } from "@src/utils/validate"
 import { vscode } from "@src/utils/vscode"
 import { useAppTranslation } from "@src/i18n/TranslationContext"

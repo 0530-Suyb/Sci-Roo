@@ -12,6 +12,7 @@ import {
 	LiteratureSource,
 	LiteratureNote,
 	DeduplicationReport,
+	RetrievalCandidate,
 	LITERATURE_LIBRARY_VERSION,
 	LITERATURE_LIBRARY_FILENAME,
 } from "@roo-code/types"
@@ -19,6 +20,8 @@ import {
 function generateId(): string {
 	return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 }
+
+type DuplicateComparableEntry = Pick<LiteratureEntry, "doi" | "pmid" | "arxivId" | "title">
 
 export class LiteratureManager {
 	private library: LiteratureLibrary = { entries: [], version: LITERATURE_LIBRARY_VERSION, lastModified: "" }
@@ -107,6 +110,63 @@ export class LiteratureManager {
 		return newEntry
 	}
 
+	async upsertReadPaperCandidate(
+		candidate: RetrievalCandidate,
+		options?: { retrievalNo?: string },
+	): Promise<{ entry: LiteratureEntry; created: boolean }> {
+		const mapped = this.mapReadPaperCandidate(candidate, options)
+		const index = this.library.entries.findIndex((entry) => this.findDuplicateReason(entry, mapped) !== null)
+		const now = new Date().toISOString()
+
+		if (index === -1) {
+			const newEntry: LiteratureEntry = {
+				...mapped,
+				id: generateId(),
+				notes: [],
+				dateAdded: now,
+				dateModified: now,
+			}
+			this.library.entries.push(newEntry)
+			await this.saveLibrary()
+			return { entry: newEntry, created: true }
+		}
+
+		const existing = this.library.entries[index]
+		const updated: LiteratureEntry = {
+			...existing,
+			...mapped,
+			id: existing.id,
+			title: mapped.title || existing.title,
+			source: mapped.source,
+			year: mapped.year ?? existing.year,
+			authors: mapped.authors.length > 0 ? mapped.authors : existing.authors,
+			keywords: uniqueStrings([...existing.keywords, ...mapped.keywords]),
+			notes: existing.notes,
+			tags: uniqueStrings([...existing.tags, ...mapped.tags]),
+			abstract: mapped.abstract || existing.abstract,
+			journal: mapped.journal || existing.journal,
+			volume: mapped.volume || existing.volume,
+			issue: mapped.issue || existing.issue,
+			pages: mapped.pages || existing.pages,
+			doi: mapped.doi || existing.doi,
+			arxivId: mapped.arxivId || existing.arxivId,
+			pmid: mapped.pmid || existing.pmid,
+			url: mapped.url || existing.url,
+			citationBibtex: mapped.citationBibtex || existing.citationBibtex,
+			citationApa: mapped.citationApa || existing.citationApa,
+			citationVancouver: mapped.citationVancouver || existing.citationVancouver,
+			relevanceScore: mapped.relevanceScore ?? existing.relevanceScore,
+			isRead: existing.isRead,
+			fullTextPath: existing.fullTextPath,
+			dateAdded: existing.dateAdded,
+			dateModified: now,
+		}
+
+		this.library.entries[index] = updated
+		await this.saveLibrary()
+		return { entry: updated, created: false }
+	}
+
 	async addEntries(
 		entries: Array<
 			Omit<LiteratureEntry, "id" | "dateAdded" | "dateModified" | "notes"> & { notes?: LiteratureNote[] }
@@ -157,6 +217,35 @@ export class LiteratureManager {
 		this.library.entries.splice(index, 1)
 		await this.saveLibrary()
 		return true
+	}
+
+	async deleteEntriesMatchingReadPaperCandidates(
+		candidates: RetrievalCandidate[],
+		options?: { retrievalNo?: string },
+	): Promise<{ deleted: number; entryIds: string[] }> {
+		const matchedEntryIds = new Set<string>()
+		const retrievalTag = options?.retrievalNo ? `readpaper:${options.retrievalNo}` : undefined
+
+		for (const candidate of candidates) {
+			const mapped = this.mapReadPaperCandidate(candidate, options)
+			for (const entry of this.library.entries) {
+				if (retrievalTag && entry.tags.includes(retrievalTag)) {
+					matchedEntryIds.add(entry.id)
+					continue
+				}
+				if (this.findDuplicateReason(entry, mapped) !== null) {
+					matchedEntryIds.add(entry.id)
+				}
+			}
+		}
+
+		if (matchedEntryIds.size === 0) {
+			return { deleted: 0, entryIds: [] }
+		}
+
+		this.library.entries = this.library.entries.filter((entry) => !matchedEntryIds.has(entry.id))
+		await this.saveLibrary()
+		return { deleted: matchedEntryIds.size, entryIds: [...matchedEntryIds] }
 	}
 
 	// ---- Notes ----
@@ -241,14 +330,68 @@ export class LiteratureManager {
 	}
 
 	private findDuplicateReason(
-		a: LiteratureEntry,
-		b: LiteratureEntry,
+		a: DuplicateComparableEntry,
+		b: DuplicateComparableEntry,
 	): DeduplicationReport["duplicateGroups"][0]["reason"] | null {
 		if (a.doi && b.doi && a.doi === b.doi) return "doi"
 		if (a.pmid && b.pmid && a.pmid === b.pmid) return "pmid"
 		if (a.arxivId && b.arxivId && a.arxivId === b.arxivId) return "arxiv-id"
 		if (this.titleSimilarity(a.title, b.title) > 0.9) return "title-fuzzy"
 		return null
+	}
+
+	private mapReadPaperCandidate(
+		candidate: RetrievalCandidate,
+		options?: { retrievalNo?: string },
+	): Omit<LiteratureEntry, "id" | "dateAdded" | "dateModified"> {
+		const tags = [
+			"readpaper",
+			options?.retrievalNo ? `readpaper:${options.retrievalNo}` : "",
+			candidate.source_id ? `source-id:${candidate.source}:${candidate.source_id}` : "",
+		].filter(Boolean)
+
+		return {
+			title: candidate.title || "",
+			authors: candidate.authors.map((author) => this.parseReadPaperAuthor(author)),
+			year: candidate.year ?? undefined,
+			journal: candidate.venue || undefined,
+			doi: candidate.doi || undefined,
+			arxivId: candidate.arxiv_id || undefined,
+			pmid: candidate.pmid || undefined,
+			abstract: candidate.abstract || undefined,
+			keywords: [...new Set(candidate.keywords.filter(Boolean))],
+			source: candidate.source,
+			url: candidate.url || undefined,
+			relevanceScore: candidate.relevance_score ?? undefined,
+			notes: [],
+			tags,
+			isRead: false,
+		}
+	}
+
+	private parseReadPaperAuthor(author: string): Author {
+		const normalized = author.trim()
+		if (!normalized) {
+			return { firstName: "", lastName: "" }
+		}
+
+		if (normalized.includes(",")) {
+			const [lastName, ...rest] = normalized.split(",")
+			return {
+				firstName: rest.join(",").trim(),
+				lastName: lastName.trim(),
+			}
+		}
+
+		const parts = normalized.split(/\s+/)
+		if (parts.length === 1) {
+			return { firstName: "", lastName: normalized }
+		}
+
+		return {
+			firstName: parts.slice(0, -1).join(" "),
+			lastName: parts[parts.length - 1],
+		}
 	}
 
 	private titleSimilarity(a: string, b: string): number {
@@ -399,4 +542,8 @@ export class LiteratureManager {
 		}
 		return breakdown
 	}
+}
+
+function uniqueStrings(values: string[]): string[] {
+	return [...new Set(values.map((value) => value.trim()).filter(Boolean))]
 }

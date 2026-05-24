@@ -10,7 +10,7 @@ import { WebviewMessage } from "@roo/WebviewMessage"
 import { Mode, getAllModes } from "@roo/modes"
 
 import { vscode } from "@src/utils/vscode"
-import { useExtensionState } from "@src/context/ExtensionStateContext"
+import { useExtensionState } from "@/context/ExtensionStateContext"
 import { useAppTranslation } from "@src/i18n/TranslationContext"
 import {
 	ContextMenuOptionType,

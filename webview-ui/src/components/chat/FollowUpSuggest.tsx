@@ -4,7 +4,7 @@ import { ClipboardCopy, Timer } from "lucide-react"
 import { Button, StandardTooltip } from "@/components/ui"
 
 import { useAppTranslation } from "@src/i18n/TranslationContext"
-import { useExtensionState } from "@src/context/ExtensionStateContext"
+import { useExtensionState } from "@/context/ExtensionStateContext"
 import { SuggestionItem } from "@roo-code/types"
 import { cn } from "@/lib/utils"
 

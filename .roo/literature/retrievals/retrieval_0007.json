@@ -19,8 +19,6 @@
 	],
 	"search_sources": ["pubmed", "arxiv"],
 	"max_results": 20,
-	"inclusion_criteria": [],
-	"exclusion_criteria": [],
 	"search_provenance": {
 		"summary": "Searched pubmed, arxiv for \"(\"characteristic mode\" OR \"characteristic modes\" OR \"theory of characteristic modes\" OR TCM OR \"Guo Xing Yue\" OR \"Xingyue Guo\" OR \"Yue Guo\") AND (progress OR advance OR development OR recent OR review OR contribution OR contributions)\".",
 		"runs": [

@@ -42,7 +42,7 @@ import {
 import { vscode } from "@src/utils/vscode"
 import { cn } from "@src/lib/utils"
 import { useAppTranslation } from "@src/i18n/TranslationContext"
-import { ExtensionStateContextType, useExtensionState } from "@src/context/ExtensionStateContext"
+import { ExtensionStateContextType, useExtensionState } from "@/context/ExtensionStateContext"
 import {
 	AlertDialog,
 	AlertDialogContent,

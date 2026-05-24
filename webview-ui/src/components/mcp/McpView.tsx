@@ -5,7 +5,7 @@ import { VSCodeLink, VSCodePanels, VSCodePanelTab, VSCodePanelView } from "@vsco
 import type { McpServer } from "@roo-code/types"
 
 import { vscode } from "@src/utils/vscode"
-import { useExtensionState } from "@src/context/ExtensionStateContext"
+import { useExtensionState } from "@/context/ExtensionStateContext"
 import { useAppTranslation } from "@src/i18n/TranslationContext"
 import { useTooManyTools } from "@src/hooks/useTooManyTools"
 import {

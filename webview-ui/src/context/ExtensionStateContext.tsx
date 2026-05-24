@@ -16,6 +16,8 @@ import {
 	type SkillMetadata,
 	type Command,
 	type McpServer,
+	type ReadPaperRetrievalState,
+	type ReadPaperWorkspaceConfig,
 	RouterModels,
 	ORGANIZATION_ALLOW_ALL,
 	DEFAULT_CHECKPOINT_TIMEOUT_SECONDS,
@@ -145,7 +147,8 @@ export interface ExtensionStateContextType extends ExtensionState {
 	setShowWorktreesInHomeScreen: (value: boolean) => void
 	skills?: SkillMetadata[]
 	literatureLibrary?: any
-	readPaperRetrievalState?: any
+	readPaperRetrievalState?: ReadPaperRetrievalState
+	readPaperWorkspaceConfig?: ReadPaperWorkspaceConfig
 	dataStudioState?: any
 	researchPipelineState?: any
 	paperWritingState?: any
@@ -299,7 +302,12 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 	})
 	const [skills, setSkills] = useState<SkillMetadata[]>([])
 	const [literatureLibrary, setLiteratureLibrary] = useState<any>(undefined)
-	const [readPaperRetrievalState, setReadPaperRetrievalState] = useState<any>(undefined)
+	const [readPaperRetrievalState, setReadPaperRetrievalState] = useState<ReadPaperRetrievalState | undefined>(
+		undefined,
+	)
+	const [readPaperWorkspaceConfig, setReadPaperWorkspaceConfig] = useState<ReadPaperWorkspaceConfig | undefined>(
+		undefined,
+	)
 	const [dataStudioState, setDataStudioState] = useState<any>(undefined)
 	const [researchPipelineState, setResearchPipelineState] = useState<any>(undefined)
 	const [paperWritingState, setPaperWritingState] = useState<any>(undefined)
@@ -489,8 +497,17 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 					break
 				}
 				case "readPaperRetrievalState": {
-					if ((message as any).readPaperRetrievalState) {
-						setReadPaperRetrievalState((message as any).readPaperRetrievalState)
+					if (message.readPaperRetrievalState) {
+						setReadPaperRetrievalState(message.readPaperRetrievalState)
+						if (message.readPaperRetrievalState.config) {
+							setReadPaperWorkspaceConfig(message.readPaperRetrievalState.config)
+						}
+					}
+					break
+				}
+				case "readPaperWorkspaceConfig": {
+					if (message.readPaperWorkspaceConfig) {
+						setReadPaperWorkspaceConfig(message.readPaperWorkspaceConfig)
 					}
 					break
 				}
@@ -692,6 +709,7 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 		skills,
 		literatureLibrary,
 		readPaperRetrievalState,
+		readPaperWorkspaceConfig,
 		dataStudioState,
 		researchPipelineState,
 		paperWritingState,
