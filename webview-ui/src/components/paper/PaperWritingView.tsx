@@ -45,6 +45,12 @@ type NextStepAction = {
 	disabled?: boolean
 }
 
+type DraftMetric = {
+	label: string
+	value: string
+	tone?: MetricTone
+}
+
 const STAGE_OPTIONS = [
 	{ id: "planning", label: "Planning" },
 	{ id: "literature-review", label: "Literature" },
@@ -85,6 +91,7 @@ const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone, onOpenResea
 
 	const [loading, setLoading] = useState(true)
 	const [sideTab, setSideTab] = useState<SideTab>("references")
+	const [supportTabPinned, setSupportTabPinned] = useState(false)
 	const [highlightSelectionAssistant, setHighlightSelectionAssistant] = useState(false)
 	const selectionAssistantRef = useRef<HTMLDivElement | null>(null)
 
@@ -105,6 +112,11 @@ const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone, onOpenResea
 	const snapshots = paperSnapshotState?.snapshots ?? []
 	const recommendedAction =
 		workspaceState?.recommendedAction ?? "Open the main manuscript and continue drafting in the editor."
+	const primaryManuscriptPath = project?.primaryManuscriptPath ?? "latex/main.tex"
+	const selectionAssistantEnabled = !!editorContext?.onPrimaryManuscript && !!editorContext?.hasSelection
+	const missingCitationCount = missing?.length ?? 0
+	const citationPlaceholderCount = manuscript?.citationPlaceholderCount ?? 0
+	const hasCitationRisk = missingCitationCount > 0 || citationPlaceholderCount > 0
 
 	useEffect(() => {
 		vscode.postMessage({ type: "paperProjectLoad" })
@@ -213,6 +225,13 @@ const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone, onOpenResea
 		})
 	}, [])
 
+	const openSupportTab = useCallback((tab: SideTab, options?: { pin?: boolean }) => {
+		if (options?.pin ?? true) {
+			setSupportTabPinned(true)
+		}
+		setSideTab(tab)
+	}, [])
+
 	const focusSelectionAssistant = useCallback(() => {
 		setHighlightSelectionAssistant(true)
 		selectionAssistantRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })
@@ -225,7 +244,7 @@ const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone, onOpenResea
 		if (editorContext?.onPrimaryManuscript && editorContext?.hasSelection) {
 			return "A passage is selected in the manuscript."
 		}
-		if ((missing?.length ?? 0) > 0 || (manuscript?.citationPlaceholderCount ?? 0) > 0) {
+		if (hasCitationRisk) {
 			return "The current draft still has citation gaps."
 		}
 		if (!manuscript?.hasPdf) {
@@ -235,38 +254,53 @@ const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone, onOpenResea
 	}, [
 		editorContext?.hasSelection,
 		editorContext?.onPrimaryManuscript,
-		manuscript?.citationPlaceholderCount,
 		manuscript?.exists,
 		manuscript?.hasPdf,
-		missing?.length,
+		hasCitationRisk,
 	])
 
-	const currentDraftStatus = useMemo(
+	const currentDraftStatus = useMemo<DraftMetric[]>(
 		() => [
 			{ label: "Words", value: `${manuscript?.wordCount ?? 0}` },
-			{ label: "Status", value: formatManuscriptStatus(manuscript?.status) },
+			{
+				label: "Status",
+				value: formatManuscriptStatus(manuscript?.status),
+				tone: manuscript?.status === "missing" ? "warning" : "ready",
+			},
 			{ label: "Heading", value: manuscript?.currentHeading ?? "No active heading" },
 			{
 				label: "Last edited",
 				value: manuscript?.lastEdited ? new Date(manuscript.lastEdited).toLocaleString() : "Not yet",
 			},
-			{ label: "Missing cites", value: `${missing?.length ?? 0}` },
-			{ label: "Placeholders", value: `${manuscript?.citationPlaceholderCount ?? 0}` },
+			{
+				label: "Missing cites",
+				value: `${missingCitationCount}`,
+				tone: missingCitationCount > 0 ? "warning" : "ready",
+			},
+			{
+				label: "Placeholders",
+				value: `${citationPlaceholderCount}`,
+				tone: citationPlaceholderCount > 0 ? "warning" : "ready",
+			},
 		],
 		[
-			manuscript?.citationPlaceholderCount,
+			citationPlaceholderCount,
 			manuscript?.currentHeading,
 			manuscript?.lastEdited,
 			manuscript?.status,
 			manuscript?.wordCount,
-			missing?.length,
+			missingCitationCount,
 		],
 	)
 
 	const nextStep = useMemo(() => {
 		const openMain: NextStepAction = {
 			label: "Open main.tex",
-			onClick: () => openProjectFile(project?.primaryManuscriptPath),
+			onClick: () => openProjectFile(primaryManuscriptPath),
+		}
+		const openOrCreateMain: NextStepAction = {
+			label: "Open main.tex",
+			onClick: () => openProjectFile(primaryManuscriptPath, { create: true, content: "" }),
 		}
 		const openPipeline: NextStepAction = { label: "Open Research Pipeline", onClick: onOpenResearchPipeline }
 		const buildPdf: NextStepAction = {
@@ -280,7 +314,7 @@ const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone, onOpenResea
 		}
 		const openReferences: NextStepAction = {
 			label: "Open references",
-			onClick: () => setSideTab("references"),
+			onClick: () => openSupportTab("references"),
 		}
 		const createSnapshot: NextStepAction = { label: "Create snapshot", onClick: handleCreateSnapshot }
 
@@ -289,7 +323,7 @@ const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone, onOpenResea
 				title: "Set up the draft entry",
 				description:
 					"The main manuscript is not ready yet. Open or regenerate the draft entry before continuing.",
-				primary: openMain,
+				primary: openOrCreateMain,
 				secondary: openPipeline,
 			}
 		}
@@ -314,7 +348,7 @@ const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone, onOpenResea
 			}
 		}
 
-		if ((missing?.length ?? 0) > 0 || (manuscript?.citationPlaceholderCount ?? 0) > 0) {
+		if (hasCitationRisk) {
 			return {
 				title: "Resolve citation gaps",
 				description:
@@ -373,14 +407,14 @@ const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone, onOpenResea
 		handleScanCitations,
 		handleSeedRevisionLog,
 		handleWorkspaceCommand,
-		manuscript?.citationPlaceholderCount,
 		manuscript?.exists,
 		manuscript?.hasPdf,
-		missing?.length,
+		hasCitationRisk,
 		onOpenResearchPipeline,
+		openSupportTab,
 		openProjectFile,
-		project?.primaryManuscriptPath,
 		project?.stage,
+		primaryManuscriptPath,
 		recommendedAction,
 		snapshots.length,
 	])
@@ -389,15 +423,15 @@ const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone, onOpenResea
 		if (!editorContext?.onPrimaryManuscript) {
 			return "Open the main manuscript to use writing actions in context."
 		}
-		if (!editorContext?.hasSelection) {
+		if (!selectionAssistantEnabled) {
 			return "Select a passage in main.tex to enable writing actions."
 		}
 		return `${editorContext.selectionWordCount ?? 0} words selected in ${truncatePath(editorContext.filePath ?? "main.tex")}`
 	}, [
 		editorContext?.filePath,
-		editorContext?.hasSelection,
 		editorContext?.onPrimaryManuscript,
 		editorContext?.selectionWordCount,
+		selectionAssistantEnabled,
 	])
 
 	const safetyItems = useMemo<Array<{ label: string; value: string; tone: MetricTone }>>(
@@ -427,6 +461,82 @@ const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone, onOpenResea
 
 	const blockingChecks = useMemo(() => checks.filter((check: any) => check.severity === "warning"), [checks])
 	const reviewChecks = useMemo(() => checks.filter((check: any) => check.severity === "info"), [checks])
+	const preferredSupportTab = useMemo<SideTab>(() => {
+		if (hasCitationRisk) {
+			return "references"
+		}
+		if (
+			blockingChecks.length > 0 ||
+			!assets?.paperPlanReady ||
+			!assets?.researchQuestionsReady ||
+			!assets?.revisionLog?.exists
+		) {
+			return "checks"
+		}
+		return "outline"
+	}, [
+		assets?.paperPlanReady,
+		assets?.researchQuestionsReady,
+		assets?.revisionLog?.exists,
+		blockingChecks.length,
+		hasCitationRisk,
+	])
+
+	const supportPanelSuggestion = useMemo(() => {
+		if (preferredSupportTab === "references") {
+			return {
+				label: "References",
+				description: "Citation gaps are currently the biggest blocker for this writing pass.",
+			}
+		}
+		if (preferredSupportTab === "checks") {
+			return {
+				label: "Checks",
+				description: "Supporting files or review safeguards need attention before the next pass.",
+			}
+		}
+		return {
+			label: "Outline",
+			description: "The draft is stable enough to navigate sections and supporting files from the outline.",
+		}
+	}, [preferredSupportTab])
+
+	const currentSupportTabDescription = useMemo(() => {
+		if (sideTab === "references") {
+			return "Resolve citation gaps and inspect the references most relevant to the current draft."
+		}
+		if (sideTab === "checks") {
+			return "Review blockers, follow-up items, and supporting writing assets."
+		}
+		return "Jump across manuscript sections and open the planning files that support this draft."
+	}, [sideTab])
+
+	const supportTabBadges = useMemo(
+		() => ({
+			references: hasCitationRisk ? missingCitationCount + citationPlaceholderCount : 0,
+			outline: 0,
+			checks:
+				blockingChecks.length +
+				(assets?.paperPlanReady ? 0 : 1) +
+				(assets?.researchQuestionsReady ? 0 : 1) +
+				(assets?.revisionLog?.exists ? 0 : 1),
+		}),
+		[
+			assets?.paperPlanReady,
+			assets?.researchQuestionsReady,
+			assets?.revisionLog?.exists,
+			blockingChecks.length,
+			citationPlaceholderCount,
+			hasCitationRisk,
+			missingCitationCount,
+		],
+	)
+
+	useEffect(() => {
+		if (!supportTabPinned) {
+			setSideTab(preferredSupportTab)
+		}
+	}, [preferredSupportTab, supportTabPinned])
 
 	if (loading && !paperProjectState) {
 		return (
@@ -457,7 +567,11 @@ const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone, onOpenResea
 				<FileText className="h-5 w-5" />
 				<div className="min-w-0">
 					<h3 className="truncate text-lg font-semibold">Paper Writing</h3>
-					{project && <p className="truncate text-xs text-muted-foreground">{headerSummary}</p>}
+					{project && (
+						<p className="truncate text-xs text-muted-foreground">
+							{project.name} · {headerSummary}
+						</p>
+					)}
 				</div>
 				{project && (
 					<div className="ml-auto flex flex-wrap items-center gap-2">
@@ -480,7 +594,9 @@ const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone, onOpenResea
 						<Button
 							variant="primary"
 							size="sm"
-							onClick={() => openProjectFile(project.primaryManuscriptPath)}>
+							onClick={() =>
+								openProjectFile(primaryManuscriptPath, { create: !manuscript?.exists, content: "" })
+							}>
 							Open main.tex
 						</Button>
 						<Button
@@ -549,7 +665,12 @@ const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone, onOpenResea
 								subtitle="The manuscript health snapshot for this writing pass.">
 								<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
 									{currentDraftStatus.map((item) => (
-										<MetricTile key={item.label} label={item.label} value={item.value} />
+										<MetricTile
+											key={item.label}
+											label={item.label}
+											value={item.value}
+											tone={item.tone}
+										/>
 									))}
 								</div>
 							</FocusCard>
@@ -573,6 +694,11 @@ const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone, onOpenResea
 											{nextStep.secondary.label}
 										</Button>
 									</div>
+									{nextStep.secondary.disabled && (
+										<p className="mt-3 text-xs text-muted-foreground">
+											This follow-up action will unlock once the current draft has been built.
+										</p>
+									)}
 								</div>
 							</FocusCard>
 
@@ -592,14 +718,44 @@ const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone, onOpenResea
 											tone={editorContext?.onPrimaryManuscript ? "ready" : "neutral"}
 										/>
 										<StatusPill
-											label={editorContext?.hasSelection ? "Selection ready" : "No selection"}
-											tone={editorContext?.hasSelection ? "ready" : "warning"}
+											label={
+												!editorContext?.onPrimaryManuscript
+													? "Open main.tex first"
+													: editorContext?.hasSelection
+														? "Selection ready"
+														: "Select text to unlock actions"
+											}
+											tone={selectionAssistantEnabled ? "ready" : "warning"}
 										/>
 										{editorContext?.filePath && (
 											<StatusPill label={truncatePath(editorContext.filePath)} />
 										)}
 									</div>
 									<p className="mt-3 text-sm text-muted-foreground">{selectionContext}</p>
+									{!selectionAssistantEnabled && (
+										<div className="mt-3 flex flex-wrap gap-2">
+											{!editorContext?.onPrimaryManuscript ? (
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={() =>
+														openProjectFile(primaryManuscriptPath, {
+															create: !manuscript?.exists,
+															content: "",
+														})
+													}>
+													Open main.tex
+												</Button>
+											) : (
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={() => openSupportTab("outline")}>
+													Open outline
+												</Button>
+											)}
+										</div>
+									)}
 								</div>
 								<div className="mt-4 space-y-3">
 									{SELECTION_ACTION_GROUPS.map((group) => (
@@ -613,7 +769,7 @@ const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone, onOpenResea
 														key={action.command}
 														variant="outline"
 														size="sm"
-														disabled={!editorContext?.hasSelection}
+														disabled={!selectionAssistantEnabled}
 														onClick={() =>
 															handleWorkspaceCommand(
 																action.command as
@@ -674,11 +830,12 @@ const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone, onOpenResea
 								].map((tab) => {
 									const Icon = tab.icon
 									const active = sideTab === tab.id
+									const badgeCount = supportTabBadges[tab.id as SideTab]
 									return (
 										<button
 											key={tab.id}
 											type="button"
-											onClick={() => setSideTab(tab.id as SideTab)}
+											onClick={() => openSupportTab(tab.id as SideTab)}
 											className={`flex flex-1 items-center justify-center gap-1 rounded-xl px-2 py-1.5 text-[11px] transition-colors ${
 												active
 													? "bg-foreground text-background"
@@ -686,11 +843,49 @@ const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone, onOpenResea
 											}`}>
 											<Icon className="h-3.5 w-3.5" />
 											<span>{tab.label}</span>
+											{badgeCount > 0 && (
+												<span
+													className={`rounded-full px-1.5 py-0.5 text-[10px] ${
+														active
+															? "bg-background/15 text-background"
+															: "bg-background text-foreground"
+													}`}>
+													{badgeCount}
+												</span>
+											)}
 										</button>
 									)
 								})}
 							</div>
 						</div>
+
+						<div className="border-b px-3 py-2 text-xs text-muted-foreground">
+							{currentSupportTabDescription}
+						</div>
+
+						{supportTabPinned && sideTab !== preferredSupportTab && (
+							<div className="border-b bg-muted/20 px-3 py-2">
+								<div className="flex flex-wrap items-center justify-between gap-2">
+									<div className="min-w-0">
+										<div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+											Suggested focus: {supportPanelSuggestion.label}
+										</div>
+										<p className="mt-1 text-xs text-muted-foreground">
+											{supportPanelSuggestion.description}
+										</p>
+									</div>
+									<Button
+										variant="ghost"
+										size="sm"
+										onClick={() => {
+											setSupportTabPinned(false)
+											setSideTab(preferredSupportTab)
+										}}>
+										Go there
+									</Button>
+								</div>
+							</div>
+						)}
 
 						<div className="min-h-0 flex-1 overflow-auto">
 							{sideTab === "references" && (
@@ -757,20 +952,24 @@ const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone, onOpenResea
 										<div className="space-y-2">
 											<AssetButton
 												label="Open paper plan"
+												meta={assets?.paperPlanReady ? "Ready" : "Empty"}
 												onClick={() => openProjectFile("task/paper-plan.md")}
 											/>
 											<AssetButton
 												label="Open research questions"
+												meta={assets?.researchQuestionsReady ? "Ready" : "Empty"}
 												onClick={() => openProjectFile("problem/research-questions.md")}
 											/>
 											{!assets?.revisionLog?.exists ? (
 												<AssetButton
 													label="Create revision log"
+													meta="Missing"
 													onClick={handleSeedRevisionLog}
 												/>
 											) : (
 												<AssetButton
 													label="Open revision log"
+													meta={`${assets.revisionLog.openItems + assets.revisionLog.checklistOpen} open`}
 													onClick={() => openProjectFile("review/revision-log.md")}
 												/>
 											)}
@@ -796,6 +995,19 @@ const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone, onOpenResea
 												/>
 											)}
 										</div>
+										{hasCitationRisk && (
+											<div className="mt-3 flex flex-wrap gap-2">
+												<Button variant="outline" size="sm" onClick={handleScanCitations}>
+													Scan citations
+												</Button>
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={() => openSupportTab("references")}>
+													Open references
+												</Button>
+											</div>
+										)}
 									</SupportSection>
 
 									<SupportSection
@@ -834,21 +1046,38 @@ const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone, onOpenResea
 												}
 											/>
 										</div>
+										<div className="mt-3 grid gap-2 sm:grid-cols-2">
+											<AssetButton
+												label="Open paper plan"
+												meta={assets?.paperPlanReady ? "Ready" : "Empty"}
+												onClick={() => openProjectFile("task/paper-plan.md")}
+											/>
+											<AssetButton
+												label="Open research questions"
+												meta={assets?.researchQuestionsReady ? "Ready" : "Empty"}
+												onClick={() => openProjectFile("problem/research-questions.md")}
+											/>
+										</div>
+										<div className="mt-2">
+											{assets?.revisionLog?.exists ? (
+												<AssetButton
+													label="Open revision log"
+													meta={`${assets.revisionLog.openItems + assets.revisionLog.checklistOpen} open`}
+													onClick={() => openProjectFile("review/revision-log.md")}
+												/>
+											) : (
+												<AssetButton
+													label="Create revision log"
+													meta="Missing"
+													onClick={handleSeedRevisionLog}
+												/>
+											)}
+										</div>
 									</SupportSection>
 								</div>
 							)}
 						</div>
 					</div>
-				</div>
-			)}
-
-			{project && (
-				<div className="flex items-center gap-4 border-t px-4 py-1.5 text-xs text-muted-foreground shrink-0">
-					<span className="max-w-[36%] truncate" title={project.rootPath}>
-						Project: {project.rootPath}
-					</span>
-					<span>Manuscript: {project.primaryManuscriptPath}</span>
-					<span>Citations: {cited?.length ?? 0}</span>
 				</div>
 			)}
 		</div>
@@ -907,13 +1136,16 @@ const MetricTile = ({ label, value, tone = "neutral" }: { label: string; value: 
 
 type MetricTone = "neutral" | "warning" | "ready"
 
-const AssetButton = ({ label, onClick }: { label: string; onClick: () => void }) => (
+const AssetButton = ({ label, meta, onClick }: { label: string; meta?: string; onClick: () => void }) => (
 	<button
 		type="button"
 		onClick={onClick}
 		className="flex w-full items-center justify-between rounded-xl border bg-background/75 px-3 py-2 text-left text-sm transition-colors hover:bg-background">
-		<span>{label}</span>
-		<FolderOpen className="h-4 w-4 text-muted-foreground" />
+		<div className="min-w-0">
+			<div>{label}</div>
+			{meta && <div className="mt-0.5 text-xs text-muted-foreground">{meta}</div>}
+		</div>
+		<FolderOpen className="ml-3 h-4 w-4 shrink-0 text-muted-foreground" />
 	</button>
 )
 

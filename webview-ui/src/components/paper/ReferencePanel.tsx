@@ -150,6 +150,16 @@ export const ReferencePanel: React.FC<ReferencePanelProps> = ({
 		return "Add BibTeX or PDFs when you are ready to build the reference library."
 	}, [citationCount, citationPlaceholderCount, entryCount, missingCount])
 	const visibleEntries = embedded ? prioritizedEntries.slice(0, 24) : prioritizedEntries.slice(0, 50)
+	const draftFocusedEntries = useMemo(() => {
+		if (!embedded) {
+			return visibleEntries
+		}
+		const citedEntries = prioritizedEntries.filter((entry: any) => cited?.includes(entry.citeKey))
+		if (citedEntries.length > 0) {
+			return citedEntries.slice(0, 6)
+		}
+		return prioritizedEntries.slice(0, 6)
+	}, [cited, embedded, prioritizedEntries, visibleEntries])
 	const topMissingKeys = useMemo(
 		() => (missing ?? []).slice(0, embedded ? 6 : (missing?.length ?? 0)),
 		[embedded, missing],
@@ -185,29 +195,44 @@ export const ReferencePanel: React.FC<ReferencePanelProps> = ({
 				</div>
 
 				<div className="border-b px-4 py-3">
-					<div className="grid grid-cols-2 gap-2">
+					<div className="rounded-xl border bg-background/75 px-3 py-2.5">
+						<div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+							Recommended workflow
+						</div>
+						<p className="mt-1 text-xs text-muted-foreground">
+							Scan the draft first, fix missing keys or placeholders, then regenerate the bibliography
+							when the citations feel stable.
+						</p>
+					</div>
+					<div className="mt-3 flex flex-col gap-2">
 						<Button
-							variant="outline"
+							variant="primary"
 							size="sm"
 							className="justify-start text-xs"
 							onClick={handleScanTex}
 							disabled={scanning}>
 							<Search className="mr-1.5 h-3 w-3" />
-							{scanning ? "Scanning..." : "Scan citations"}
+							{scanning ? "Scanning..." : "Scan citations in the draft"}
 						</Button>
-						<Button
-							variant="outline"
-							size="sm"
-							className="justify-start text-xs"
-							onClick={handleGenerateBib}
-							disabled={generating}>
-							<FileOutput className="mr-1.5 h-3 w-3" />
-							{generating ? "Generating..." : "Generate .bib"}
-						</Button>
-						<Button variant="outline" size="sm" className="justify-start text-xs" onClick={handleScanPdf}>
-							<FileWarning className="mr-1.5 h-3 w-3" />
-							Scan PDFs
-						</Button>
+						<div className="grid grid-cols-2 gap-2">
+							<Button
+								variant="outline"
+								size="sm"
+								className="justify-start text-xs"
+								onClick={handleGenerateBib}
+								disabled={generating || entryCount === 0}>
+								<FileOutput className="mr-1.5 h-3 w-3" />
+								{generating ? "Generating..." : "Generate .bib"}
+							</Button>
+							<Button
+								variant="outline"
+								size="sm"
+								className="justify-start text-xs"
+								onClick={handleScanPdf}>
+								<FileWarning className="mr-1.5 h-3 w-3" />
+								Scan PDFs
+							</Button>
+						</div>
 						<Button
 							variant="ghost"
 							size="sm"
@@ -312,6 +337,23 @@ export const ReferencePanel: React.FC<ReferencePanelProps> = ({
 									</span>
 								)}
 							</div>
+							<div className="mt-3 flex flex-wrap gap-2">
+								<Button
+									variant="outline"
+									size="sm"
+									className="text-xs"
+									onClick={() => setShowImportBox(true)}>
+									Import BibTeX
+								</Button>
+								<Button
+									variant="outline"
+									size="sm"
+									className="text-xs"
+									onClick={handleScanTex}
+									disabled={scanning}>
+									{scanning ? "Scanning..." : "Re-scan citations"}
+								</Button>
+							</div>
 						</div>
 					)}
 
@@ -342,11 +384,14 @@ export const ReferencePanel: React.FC<ReferencePanelProps> = ({
 					<div className="rounded-xl border bg-muted/20 p-3">
 						<div className="mb-2 flex items-center gap-1 text-xs font-medium">
 							<Library className="h-3.5 w-3.5 text-sky-600" />
-							Library highlights
+							Draft-linked references
 						</div>
-						{visibleEntries.length > 0 ? (
+						<p className="mb-2 text-[11px] text-muted-foreground">
+							Showing the references most relevant to the current manuscript pass.
+						</p>
+						{draftFocusedEntries.length > 0 ? (
 							<div className="space-y-2">
-								{visibleEntries.slice(0, 8).map((entry: any) => {
+								{draftFocusedEntries.map((entry: any) => {
 									const isCited = cited ? cited.includes(entry.citeKey) : false
 									return (
 										<div
@@ -369,9 +414,16 @@ export const ReferencePanel: React.FC<ReferencePanelProps> = ({
 										</div>
 									)
 								})}
-								{referenceEntries.length > 8 && (
+								{citationCount === 0 && (
 									<div className="text-[11px] text-muted-foreground">
-										Showing the first 8 library entries in this side panel.
+										No cited keys have been detected in the draft yet, so this panel is showing the
+										first relevant library entries.
+									</div>
+								)}
+								{embedded && prioritizedEntries.length > draftFocusedEntries.length && (
+									<div className="text-[11px] text-muted-foreground">
+										Additional library entries remain available after the current draft-linked
+										items.
 									</div>
 								)}
 							</div>
@@ -382,7 +434,7 @@ export const ReferencePanel: React.FC<ReferencePanelProps> = ({
 						)}
 					</div>
 
-					{bibPreview && (
+					{bibPreview && bibGenerated && (missingCount > 0 || citationPlaceholderCount > 0) && (
 						<div className="rounded-xl border bg-muted/20 p-3">
 							<div className="mb-1.5 flex items-center justify-between">
 								<p className="text-xs font-medium text-emerald-700">Latest .bib preview</p>
