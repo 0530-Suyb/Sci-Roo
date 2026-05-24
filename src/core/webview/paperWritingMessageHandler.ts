@@ -4,8 +4,45 @@ import { singleCompletionHandler } from "../../utils/single-completion-handler"
 import type { SectionType } from "@roo-code/types"
 import { runPaperWorkspaceCommand } from "../../services/paper/paperWorkspaceActions"
 import { buildPaperWorkspaceState } from "../../services/paper/paperWorkspaceState"
+import type { PaperProject } from "@roo-code/types"
 
 // ─── Legacy handlers (kept for backward compat during transition) ────
+
+async function refreshPaperWorkspaceState(provider: ClineProvider, project: PaperProject): Promise<void> {
+	const referenceMgr = provider.getReferenceManager()
+	const sectionMgr = provider.getPaperSectionManager()
+
+	if (!referenceMgr || !sectionMgr) {
+		return
+	}
+
+	const entries = await referenceMgr.listEntries()
+	const uncatalogued = await referenceMgr.scanUncataloguedPdfs()
+	const { cited, missing } = await referenceMgr.scanTexCitations()
+	const snapshots = await sectionMgr.listSnapshots()
+	const workspaceState = await buildPaperWorkspaceState(provider, project, {
+		missingCitationKeys: missing,
+		citedKeys: cited,
+	})
+
+	await provider.postMessageToWebview({
+		type: "paperProjectState",
+		paperProjectState: {
+			project,
+			referenceEntries: entries,
+			uncatalogued,
+			workspaceState,
+		},
+	})
+	await provider.postMessageToWebview({
+		type: "paperReferenceState",
+		paperReferenceState: { entries, uncatalogued, cited, missing },
+	})
+	await provider.postMessageToWebview({
+		type: "paperSnapshotState",
+		paperSnapshotState: { snapshots },
+	})
+}
 
 export async function handlePaperWritingAction(provider: ClineProvider, message: WebviewMessage): Promise<void> {
 	try {
@@ -112,6 +149,19 @@ export async function handlePaperWritingAction(provider: ClineProvider, message:
 				})
 				return
 			}
+			case "chatBindingUpdate": {
+				const bindingKey = message.query as "problemFramingTaskId" | "paperDraftTaskId" | undefined
+				const taskId = message.text as string | undefined
+				if (!bindingKey || !currentProject) {
+					return
+				}
+				await paperProject.updateChatBinding(bindingKey, taskId)
+				await provider.postMessageToWebview({
+					type: "paperProjectState",
+					paperProjectState: { project: paperProject.getCurrentProject() },
+				})
+				return
+			}
 			case "workspaceCommand": {
 				const command =
 					(message.query as
@@ -121,8 +171,18 @@ export async function handlePaperWritingAction(provider: ClineProvider, message:
 						| "paperOpenSourceControl"
 						| "paperRewriteSelection"
 						| "paperRephraseSelection"
+						| "paperReplaceWithAcademicSynonyms"
 						| "paperMakeConciseSelection"
 						| "paperMakeAcademicSelection"
+						| "paperMakePreciseSelection"
+						| "paperAbbreviateSelection"
+						| "paperSplitSentencesSelection"
+						| "paperMergeSentencesSelection"
+						| "paperSummarizeSelection"
+						| "paperExplainSelection"
+						| "paperGenerateTitleFromSelection"
+						| "paperGenerateAbstractFromSelection"
+						| "paperGenerateKeywordsFromSelection"
 						| "paperExpandAcademicParagraph"
 						| "paperAddCitationPlaceholder"
 						| "paperTranslateSelectionChinese"
@@ -132,6 +192,14 @@ export async function handlePaperWritingAction(provider: ClineProvider, message:
 					return
 				}
 				await runPaperWorkspaceCommand(provider, command)
+				if (currentProject) {
+					await refreshPaperWorkspaceState(provider, currentProject)
+					if (command === "paperBuildManuscript") {
+						setTimeout(() => {
+							void refreshPaperWorkspaceState(provider, currentProject)
+						}, 4000)
+					}
+				}
 				return
 			}
 			case "revisionLogSeed": {
@@ -414,11 +482,16 @@ export async function handlePaperWritingAction(provider: ClineProvider, message:
 			// ── Snapshots ──
 			case "snapshotCreate": {
 				const label = message.query as string | undefined
-				const meta = await sectionMgr.createSnapshot(label)
-				await provider.postMessageToWebview({
-					type: "paperSnapshotState",
-					paperSnapshotState: { snapshot: meta },
-				})
+				await sectionMgr.createSnapshot(label)
+				if (currentProject) {
+					await refreshPaperWorkspaceState(provider, currentProject)
+				} else {
+					const snapshots = await sectionMgr.listSnapshots()
+					await provider.postMessageToWebview({
+						type: "paperSnapshotState",
+						paperSnapshotState: { snapshots },
+					})
+				}
 				return
 			}
 			case "snapshotList": {

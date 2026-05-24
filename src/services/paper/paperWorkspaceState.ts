@@ -14,6 +14,8 @@ export type PaperWorkspaceState = {
 	manuscript: {
 		relativePath: string | null | undefined
 		absolutePath: string | null | undefined
+		pdfAbsolutePath: string | null
+		pdfRelativePath: string | null
 		exists: boolean
 		wordCount: number
 		lastEdited: string | null
@@ -83,7 +85,6 @@ export async function buildPaperWorkspaceState(
 	const manuscriptPath = paperProjectManager?.getPrimaryManuscriptAbsolutePath(project)
 	const relativePath = paperProjectManager?.getPrimaryManuscriptRelativePath(project)
 	const bibliographyPath = path.join(project.rootPath, "latex", "references.bib")
-	const pdfPath = path.join(project.rootPath, "latex", "paper.pdf")
 	const paperPlanPath = path.join(project.rootPath, "task", "paper-plan.md")
 	const researchQuestionsPath = path.join(project.rootPath, "problem", "research-questions.md")
 	const revisionLogPath = path.join(project.rootPath, "review", "revision-log.md")
@@ -114,10 +115,13 @@ export async function buildPaperWorkspaceState(
 	const outline = parseLatexOutline(manuscriptContent)
 	const currentHeading = editorOnPrimaryManuscript && editorLine ? getCurrentHeading(outline, editorLine) : null
 
+	const preferredPdfPath = await paperProjectManager?.getPreferredPdfAbsolutePath(project)
+	const pdfRelativePath = preferredPdfPath ? path.relative(project.rootPath, preferredPdfPath) : null
+
 	const [hasBibliographyFile, hasPdf, gitStatus, paperPlanReady, researchQuestionsReady, revisionLog] =
 		await Promise.all([
 			fileExists(bibliographyPath),
-			fileExists(pdfPath),
+			preferredPdfPath ? fileExists(preferredPdfPath) : Promise.resolve(false),
 			getGitWorkspaceStatus(project.rootPath),
 			hasMeaningfulMarkdownContent(paperPlanPath, "Paper Plan"),
 			hasMeaningfulMarkdownContent(researchQuestionsPath, "Research Questions"),
@@ -139,6 +143,8 @@ export async function buildPaperWorkspaceState(
 		manuscript: {
 			relativePath,
 			absolutePath: manuscriptPath,
+			pdfAbsolutePath: preferredPdfPath ?? null,
+			pdfRelativePath,
 			exists,
 			wordCount,
 			lastEdited,

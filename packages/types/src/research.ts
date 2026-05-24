@@ -192,6 +192,11 @@ export interface RevisionPlan {
 
 export type PaperProjectStage = "planning" | "literature-review" | "writing" | "revising" | "final" | "submitted"
 
+export interface PaperChatBindings {
+	problemFramingTaskId?: string
+	paperDraftTaskId?: string
+}
+
 export interface PaperProject {
 	id: string
 	name: string
@@ -202,6 +207,7 @@ export interface PaperProject {
 	templateSource: "builtin" | "custom"
 	directoryTemplate: string
 	stage: PaperProjectStage
+	chatBindings?: PaperChatBindings
 	customSectionConfigs?: Partial<
 		Record<SectionType, { label?: string; targetWordRange?: [number, number]; status?: SectionWorkflowStatus }>
 	>

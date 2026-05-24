@@ -4,6 +4,7 @@ import type { ClineProvider } from "../../core/webview/ClineProvider"
 import type {
 	PaperProject,
 	PaperProjectStage,
+	PaperChatBindings,
 	DirectoryTemplate,
 	DirectoryNode,
 	PaperWritingState,
@@ -90,6 +91,45 @@ export class PaperProjectManager {
 			return undefined
 		}
 		return path.join(project.rootPath, this.getPrimaryManuscriptRelativePath(project)!)
+	}
+
+	async getPreferredPdfAbsolutePath(
+		project: PaperProject | undefined = this.currentProject,
+	): Promise<string | undefined> {
+		if (!project) {
+			return undefined
+		}
+
+		const manuscriptPath = this.getPrimaryManuscriptAbsolutePath(project)
+		if (manuscriptPath) {
+			const parsed = path.parse(manuscriptPath)
+			const sameNamePdfPath = path.join(parsed.dir, `${parsed.name}.pdf`)
+			if (await this.exists(sameNamePdfPath)) {
+				return sameNamePdfPath
+			}
+		}
+
+		const latexDir = path.join(project.rootPath, "latex")
+		try {
+			const entries = await fs.readdir(latexDir, { withFileTypes: true })
+			const pdfCandidates = await Promise.all(
+				entries
+					.filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith(".pdf"))
+					.map(async (entry) => {
+						const absolutePath = path.join(latexDir, entry.name)
+						const stat = await fs.stat(absolutePath)
+						return {
+							absolutePath,
+							mtimeMs: stat.mtimeMs,
+						}
+					}),
+			)
+
+			pdfCandidates.sort((a, b) => b.mtimeMs - a.mtimeMs)
+			return pdfCandidates[0]?.absolutePath
+		} catch {
+			return undefined
+		}
 	}
 
 	// ─── Accessors ──────────────────────────────────────────────────────
@@ -223,6 +263,26 @@ export class PaperProjectManager {
 	async updateStage(stage: PaperProjectStage): Promise<void> {
 		if (!this.currentProject) throw new Error("No active project")
 		this.currentProject.stage = stage
+		this.currentProject.updatedAt = new Date().toISOString()
+		await this.saveCurrentProject()
+	}
+
+	async updateChatBinding(bindingKey: keyof PaperChatBindings, taskId: string | undefined): Promise<void> {
+		if (!this.currentProject) {
+			throw new Error("No active project")
+		}
+
+		const nextBindings: PaperChatBindings = {
+			...(this.currentProject.chatBindings ?? {}),
+		}
+
+		if (taskId && taskId.trim().length > 0) {
+			nextBindings[bindingKey] = taskId
+		} else {
+			delete nextBindings[bindingKey]
+		}
+
+		this.currentProject.chatBindings = nextBindings
 		this.currentProject.updatedAt = new Date().toISOString()
 		await this.saveCurrentProject()
 	}
@@ -474,9 +534,10 @@ export class PaperProjectManager {
 		const normalized: PaperProject = {
 			...project,
 			primaryManuscriptPath: project.primaryManuscriptPath || path.join("latex", "main.tex"),
+			chatBindings: project.chatBindings ?? {},
 		}
 
-		if (!project.primaryManuscriptPath) {
+		if (!project.primaryManuscriptPath || !project.chatBindings) {
 			await this.saveProject(normalized.rootPath, normalized)
 		}
 

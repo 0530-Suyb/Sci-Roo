@@ -8,8 +8,18 @@ import { ClineProvider } from "../core/webview/ClineProvider"
 type PaperEditorActionId =
 	| "paperRewriteSelection"
 	| "paperRephraseSelection"
+	| "paperReplaceWithAcademicSynonyms"
 	| "paperMakeConciseSelection"
 	| "paperMakeAcademicSelection"
+	| "paperMakePreciseSelection"
+	| "paperAbbreviateSelection"
+	| "paperSplitSentencesSelection"
+	| "paperMergeSentencesSelection"
+	| "paperSummarizeSelection"
+	| "paperExplainSelection"
+	| "paperGenerateTitleFromSelection"
+	| "paperGenerateAbstractFromSelection"
+	| "paperGenerateKeywordsFromSelection"
 	| "paperExpandAcademicParagraph"
 	| "paperAddCitationPlaceholder"
 	| "paperTranslateSelectionChinese"
@@ -256,6 +266,12 @@ const PAPER_EDITOR_ACTIONS: PaperEditorActionConfig[] = [
 			`Rephrase the following academic text using different wording and sentence structure while preserving the exact meaning, citations, and LaTeX syntax. Return only the rephrased text.\n\n${text}`,
 	},
 	{
+		id: "paperReplaceWithAcademicSynonyms",
+		label: "Replace With Academic Synonyms",
+		buildPrompt: (text) =>
+			`Replace words in the following academic text with more appropriate academic synonyms while preserving the original meaning, citations, and LaTeX syntax. Keep the sentence structure as stable as possible. Return only the revised text.\n\n${text}`,
+	},
+	{
 		id: "paperMakeConciseSelection",
 		label: "Make Selection Concise",
 		buildPrompt: (text) =>
@@ -266,6 +282,60 @@ const PAPER_EDITOR_ACTIONS: PaperEditorActionConfig[] = [
 		label: "Make Selection More Academic",
 		buildPrompt: (text) =>
 			`Revise the following text so it reads more like polished academic writing: precise, formal, and rigorous, while preserving meaning, citations, and LaTeX syntax. Return only the revised text.\n\n${text}`,
+	},
+	{
+		id: "paperMakePreciseSelection",
+		label: "Make Selection More Precise",
+		buildPrompt: (text) =>
+			`Revise the following academic text to be more precise and specific, removing vague or generic wording while preserving meaning, citations, and LaTeX syntax. Return only the revised text.\n\n${text}`,
+	},
+	{
+		id: "paperAbbreviateSelection",
+		label: "Abbreviate Selection",
+		buildPrompt: (text) =>
+			`Abbreviate the following academic text into a shorter version while retaining the key information, citations, and LaTeX syntax. Return only the abbreviated text.\n\n${text}`,
+	},
+	{
+		id: "paperSplitSentencesSelection",
+		label: "Split Sentences",
+		buildPrompt: (text) =>
+			`Revise the following academic text by splitting overly long or overloaded sentences into clearer shorter sentences. Preserve meaning, citations, and LaTeX syntax. Return only the revised text.\n\n${text}`,
+	},
+	{
+		id: "paperMergeSentencesSelection",
+		label: "Merge Sentences",
+		buildPrompt: (text) =>
+			`Revise the following academic text by merging overly short, choppy, or fragmented sentences into smoother, more coherent sentences where helpful. Preserve meaning, citations, and LaTeX syntax. Return only the revised text.\n\n${text}`,
+	},
+	{
+		id: "paperSummarizeSelection",
+		label: "Summarize Selection",
+		buildPrompt: (text) =>
+			`Summarize the following academic text concisely, capturing the main points and key findings while preserving scientific meaning. Return only the summary.\n\n${text}`,
+	},
+	{
+		id: "paperExplainSelection",
+		label: "Explain Selection",
+		buildPrompt: (text) =>
+			`Explain the following academic text in simpler, clearer terms for a broader scientific audience. Preserve the core meaning. Return only the explanation.\n\n${text}`,
+	},
+	{
+		id: "paperGenerateTitleFromSelection",
+		label: "Generate Title From Selection",
+		buildPrompt: (text) =>
+			`Generate a concise, descriptive academic title based on the following content. Return only the title.\n\n${text}`,
+	},
+	{
+		id: "paperGenerateAbstractFromSelection",
+		label: "Generate Abstract From Selection",
+		buildPrompt: (text) =>
+			`Write a structured academic abstract based on the following content. Include background, methods, results, and conclusions where supported by the text. Do not invent facts. Return only the abstract.\n\n${text}`,
+	},
+	{
+		id: "paperGenerateKeywordsFromSelection",
+		label: "Generate Keywords From Selection",
+		buildPrompt: (text) =>
+			`Extract 5-8 relevant academic keywords from the following content, formatted as a comma-separated list. Return only the keywords.\n\n${text}`,
 	},
 	{
 		id: "paperExpandAcademicParagraph",

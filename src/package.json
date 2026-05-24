@@ -121,6 +121,11 @@
 				"category": "Paper Writing"
 			},
 			{
+				"command": "sci-roo.paperReplaceWithAcademicSynonyms",
+				"title": "%command.paperReplaceWithAcademicSynonyms.title%",
+				"category": "Paper Writing"
+			},
+			{
 				"command": "sci-roo.paperMakeConciseSelection",
 				"title": "%command.paperMakeConciseSelection.title%",
 				"category": "Paper Writing"
@@ -128,6 +133,51 @@
 			{
 				"command": "sci-roo.paperMakeAcademicSelection",
 				"title": "%command.paperMakeAcademicSelection.title%",
+				"category": "Paper Writing"
+			},
+			{
+				"command": "sci-roo.paperMakePreciseSelection",
+				"title": "%command.paperMakePreciseSelection.title%",
+				"category": "Paper Writing"
+			},
+			{
+				"command": "sci-roo.paperAbbreviateSelection",
+				"title": "%command.paperAbbreviateSelection.title%",
+				"category": "Paper Writing"
+			},
+			{
+				"command": "sci-roo.paperSplitSentencesSelection",
+				"title": "%command.paperSplitSentencesSelection.title%",
+				"category": "Paper Writing"
+			},
+			{
+				"command": "sci-roo.paperMergeSentencesSelection",
+				"title": "%command.paperMergeSentencesSelection.title%",
+				"category": "Paper Writing"
+			},
+			{
+				"command": "sci-roo.paperSummarizeSelection",
+				"title": "%command.paperSummarizeSelection.title%",
+				"category": "Paper Writing"
+			},
+			{
+				"command": "sci-roo.paperExplainSelection",
+				"title": "%command.paperExplainSelection.title%",
+				"category": "Paper Writing"
+			},
+			{
+				"command": "sci-roo.paperGenerateTitleFromSelection",
+				"title": "%command.paperGenerateTitleFromSelection.title%",
+				"category": "Paper Writing"
+			},
+			{
+				"command": "sci-roo.paperGenerateAbstractFromSelection",
+				"title": "%command.paperGenerateAbstractFromSelection.title%",
+				"category": "Paper Writing"
+			},
+			{
+				"command": "sci-roo.paperGenerateKeywordsFromSelection",
+				"title": "%command.paperGenerateKeywordsFromSelection.title%",
 				"category": "Paper Writing"
 			},
 			{
@@ -287,33 +337,83 @@
 					"when": "editorHasSelection && (editorLangId == latex || editorLangId == markdown || resourceExtname == .tex || resourceExtname == .md)"
 				},
 				{
-					"command": "sci-roo.paperMakeConciseSelection",
+					"command": "sci-roo.paperReplaceWithAcademicSynonyms",
 					"group": "2_paper@3",
 					"when": "editorHasSelection && (editorLangId == latex || editorLangId == markdown || resourceExtname == .tex || resourceExtname == .md)"
 				},
 				{
-					"command": "sci-roo.paperMakeAcademicSelection",
+					"command": "sci-roo.paperMakeConciseSelection",
 					"group": "2_paper@4",
 					"when": "editorHasSelection && (editorLangId == latex || editorLangId == markdown || resourceExtname == .tex || resourceExtname == .md)"
 				},
 				{
-					"command": "sci-roo.paperExpandAcademicParagraph",
+					"command": "sci-roo.paperMakeAcademicSelection",
 					"group": "2_paper@5",
 					"when": "editorHasSelection && (editorLangId == latex || editorLangId == markdown || resourceExtname == .tex || resourceExtname == .md)"
 				},
 				{
-					"command": "sci-roo.paperAddCitationPlaceholder",
+					"command": "sci-roo.paperMakePreciseSelection",
 					"group": "2_paper@6",
 					"when": "editorHasSelection && (editorLangId == latex || editorLangId == markdown || resourceExtname == .tex || resourceExtname == .md)"
 				},
 				{
-					"command": "sci-roo.paperTranslateSelectionChinese",
+					"command": "sci-roo.paperAbbreviateSelection",
 					"group": "2_paper@7",
 					"when": "editorHasSelection && (editorLangId == latex || editorLangId == markdown || resourceExtname == .tex || resourceExtname == .md)"
 				},
 				{
-					"command": "sci-roo.paperTranslateSelectionEnglish",
+					"command": "sci-roo.paperSplitSentencesSelection",
 					"group": "2_paper@8",
+					"when": "editorHasSelection && (editorLangId == latex || editorLangId == markdown || resourceExtname == .tex || resourceExtname == .md)"
+				},
+				{
+					"command": "sci-roo.paperMergeSentencesSelection",
+					"group": "2_paper@9",
+					"when": "editorHasSelection && (editorLangId == latex || editorLangId == markdown || resourceExtname == .tex || resourceExtname == .md)"
+				},
+				{
+					"command": "sci-roo.paperSummarizeSelection",
+					"group": "2_paper@10",
+					"when": "editorHasSelection && (editorLangId == latex || editorLangId == markdown || resourceExtname == .tex || resourceExtname == .md)"
+				},
+				{
+					"command": "sci-roo.paperExplainSelection",
+					"group": "2_paper@11",
+					"when": "editorHasSelection && (editorLangId == latex || editorLangId == markdown || resourceExtname == .tex || resourceExtname == .md)"
+				},
+				{
+					"command": "sci-roo.paperGenerateTitleFromSelection",
+					"group": "2_paper@12",
+					"when": "editorHasSelection && (editorLangId == latex || editorLangId == markdown || resourceExtname == .tex || resourceExtname == .md)"
+				},
+				{
+					"command": "sci-roo.paperGenerateAbstractFromSelection",
+					"group": "2_paper@13",
+					"when": "editorHasSelection && (editorLangId == latex || editorLangId == markdown || resourceExtname == .tex || resourceExtname == .md)"
+				},
+				{
+					"command": "sci-roo.paperGenerateKeywordsFromSelection",
+					"group": "2_paper@14",
+					"when": "editorHasSelection && (editorLangId == latex || editorLangId == markdown || resourceExtname == .tex || resourceExtname == .md)"
+				},
+				{
+					"command": "sci-roo.paperExpandAcademicParagraph",
+					"group": "2_paper@15",
+					"when": "editorHasSelection && (editorLangId == latex || editorLangId == markdown || resourceExtname == .tex || resourceExtname == .md)"
+				},
+				{
+					"command": "sci-roo.paperAddCitationPlaceholder",
+					"group": "2_paper@16",
+					"when": "editorHasSelection && (editorLangId == latex || editorLangId == markdown || resourceExtname == .tex || resourceExtname == .md)"
+				},
+				{
+					"command": "sci-roo.paperTranslateSelectionChinese",
+					"group": "2_paper@17",
+					"when": "editorHasSelection && (editorLangId == latex || editorLangId == markdown || resourceExtname == .tex || resourceExtname == .md)"
+				},
+				{
+					"command": "sci-roo.paperTranslateSelectionEnglish",
+					"group": "2_paper@18",
 					"when": "editorHasSelection && (editorLangId == latex || editorLangId == markdown || resourceExtname == .tex || resourceExtname == .md)"
 				}
 			],

@@ -12,8 +12,18 @@ export type PaperWorkspaceCommandId =
 	| "paperOpenSourceControl"
 	| "paperRewriteSelection"
 	| "paperRephraseSelection"
+	| "paperReplaceWithAcademicSynonyms"
 	| "paperMakeConciseSelection"
 	| "paperMakeAcademicSelection"
+	| "paperMakePreciseSelection"
+	| "paperAbbreviateSelection"
+	| "paperSplitSentencesSelection"
+	| "paperMergeSentencesSelection"
+	| "paperSummarizeSelection"
+	| "paperExplainSelection"
+	| "paperGenerateTitleFromSelection"
+	| "paperGenerateAbstractFromSelection"
+	| "paperGenerateKeywordsFromSelection"
 	| "paperExpandAcademicParagraph"
 	| "paperAddCitationPlaceholder"
 	| "paperTranslateSelectionChinese"
@@ -59,7 +69,13 @@ export async function runPaperWorkspaceCommand(
 				await vscode.commands.executeCommand("latex-workshop.view")
 				return
 			} catch {
-				const pdfPath = path.join(project.rootPath, "latex", "paper.pdf")
+				const pdfPath = await paperProjectManager.getPreferredPdfAbsolutePath(project)
+				if (!pdfPath) {
+					vscode.window.showWarningMessage(
+						"Could not locate a compiled manuscript PDF. Build with LaTeX Workshop first, then try again.",
+					)
+					return
+				}
 				try {
 					const document = await vscode.workspace.openTextDocument(pdfPath)
 					await vscode.window.showTextDocument(document, { preview: true, preserveFocus: false })
@@ -78,8 +94,18 @@ export async function runPaperWorkspaceCommand(
 		}
 		case "paperRewriteSelection":
 		case "paperRephraseSelection":
+		case "paperReplaceWithAcademicSynonyms":
 		case "paperMakeConciseSelection":
 		case "paperMakeAcademicSelection":
+		case "paperMakePreciseSelection":
+		case "paperAbbreviateSelection":
+		case "paperSplitSentencesSelection":
+		case "paperMergeSentencesSelection":
+		case "paperSummarizeSelection":
+		case "paperExplainSelection":
+		case "paperGenerateTitleFromSelection":
+		case "paperGenerateAbstractFromSelection":
+		case "paperGenerateKeywordsFromSelection":
 		case "paperExpandAcademicParagraph":
 		case "paperAddCitationPlaceholder":
 		case "paperTranslateSelectionChinese":

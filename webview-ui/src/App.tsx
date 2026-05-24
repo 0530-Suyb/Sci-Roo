@@ -41,6 +41,13 @@ type Tab =
 	| "researchPipeline"
 	| "paperWriting"
 
+type ProjectChatBindingKey = "problemFramingTaskId" | "paperDraftTaskId"
+
+interface PendingProjectChatBinding {
+	bindingKey: ProjectChatBindingKey
+	projectRoot: string
+}
+
 interface DeleteMessageDialogState {
 	isOpen: boolean
 	messageTs: number
@@ -86,6 +93,7 @@ const App = () => {
 		cloudOrganizations,
 		renderContext,
 		mdmCompliant,
+		currentTaskId,
 	} = useExtensionState()
 
 	// Create a persistent state manager
@@ -135,6 +143,8 @@ const App = () => {
 
 	const [currentSection, setCurrentSection] = useState<string | undefined>(undefined)
 	const [currentMarketplaceTab, setCurrentMarketplaceTab] = useState<string | undefined>(undefined)
+	const [pendingProjectChatBinding, setPendingProjectChatBinding] = useState<PendingProjectChatBinding | null>(null)
+	const previousCurrentTaskIdRef = useRef<string | undefined>(undefined)
 
 	const onMessage = useCallback(
 		(e: MessageEvent) => {
@@ -203,8 +213,55 @@ const App = () => {
 		}
 	}, [telemetrySetting, telemetryKey, machineId, didHydrateState])
 
-	// Tell the extension that we are ready to receive messages.
-	useEffect(() => vscode.postMessage({ type: "webviewDidLaunch" }), [])
+	useEffect(() => {
+		const previousTaskId = previousCurrentTaskIdRef.current
+		previousCurrentTaskIdRef.current = currentTaskId
+
+		if (!pendingProjectChatBinding || !currentTaskId || currentTaskId === previousTaskId) {
+			return
+		}
+
+		vscode.postMessage({
+			type: "paperProjectCreate",
+			action: "chatBindingUpdate",
+			query: pendingProjectChatBinding.bindingKey,
+			text: currentTaskId,
+			values: { rootPath: pendingProjectChatBinding.projectRoot },
+		} as any)
+		setPendingProjectChatBinding(null)
+	}, [currentTaskId, pendingProjectChatBinding])
+
+	const openProjectBoundChat = useCallback(
+		({
+			bindingKey,
+			projectRoot,
+			mode,
+			prompt,
+			existingTaskId,
+		}: {
+			bindingKey: ProjectChatBindingKey
+			projectRoot: string
+			mode: string
+			prompt: string
+			existingTaskId?: string
+		}) => {
+			if (existingTaskId) {
+				setPendingProjectChatBinding(null)
+				switchTab("chat")
+				vscode.postMessage({ type: "showTaskWithId", text: existingTaskId } as any)
+				return
+			}
+
+			setPendingProjectChatBinding({ bindingKey, projectRoot })
+			vscode.postMessage({ type: "clearTask" } as any)
+			vscode.postMessage({ type: "mode", text: mode } as any)
+			switchTab("chat")
+			window.setTimeout(() => {
+				vscode.postMessage({ type: "insertTextIntoTextarea", text: prompt } as any)
+			}, 50)
+		},
+		[switchTab],
+	)
 
 	// Initialize source map support for better error reporting
 	useEffect(() => {
@@ -268,11 +325,12 @@ const App = () => {
 			{tab === "literature" && <LiteratureView onDone={() => switchTab("researchPipeline")} />}
 			{tab === "readPaper" && <ReadPaperView onDone={() => switchTab("researchPipeline")} />}
 			{tab === "dataStudio" && <DataStudioView onDone={() => switchTab("researchPipeline")} />}
-			{tab === "researchPipeline" && <ResearchPipelineView />}
+			{tab === "researchPipeline" && <ResearchPipelineView onOpenBoundChat={openProjectBoundChat} />}
 			{tab === "paperWriting" && (
 				<PaperWritingView
 					onDone={() => switchTab("researchPipeline")}
 					onOpenResearchPipeline={() => switchTab("researchPipeline")}
+					onOpenBoundChat={openProjectBoundChat}
 				/>
 			)}
 			<ChatView

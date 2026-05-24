@@ -17,9 +17,16 @@ import { ProjectCreateForm } from "../paper/ProjectCreateForm"
 
 type ResearchPipelineViewProps = {
 	onDone?: () => void
+	onOpenBoundChat?: (options: {
+		bindingKey: "problemFramingTaskId" | "paperDraftTaskId"
+		projectRoot: string
+		mode: string
+		prompt: string
+		existingTaskId?: string
+	}) => void
 }
 
-const ResearchPipelineView: React.FC<ResearchPipelineViewProps> = ({ onDone }) => {
+const ResearchPipelineView: React.FC<ResearchPipelineViewProps> = ({ onDone, onOpenBoundChat }) => {
 	const { paperProjectState, readPaperRetrievalState, dataStudioState, cwd } = useExtensionState()
 	const workspaceProject = paperProjectState?.project ?? null
 	const workspaceState = paperProjectState?.workspaceState ?? null
@@ -82,10 +89,14 @@ const ResearchPipelineView: React.FC<ResearchPipelineViewProps> = ({ onDone }) =
 			"Help me turn this description into a concrete research problem, scope boundaries, and candidate research questions before planning the manuscript.",
 		].join("\n")
 
-		vscode.postMessage({ type: "mode", text: "sci-problem-framing" } as any)
-		vscode.postMessage({ type: "switchTab", tab: "chat" } as any)
-		vscode.postMessage({ type: "newTask", text: prompt } as any)
-	}, [cwd, workspaceProject])
+		onOpenBoundChat?.({
+			bindingKey: "problemFramingTaskId",
+			projectRoot: workspaceProject.rootPath,
+			mode: "sci-problem-framing",
+			prompt,
+			existingTaskId: workspaceProject.chatBindings?.problemFramingTaskId,
+		})
+	}, [cwd, onOpenBoundChat, workspaceProject])
 
 	const workspaceStatus = workspaceProject ? "Created" : "Not Created"
 	const workspaceSummary = useMemo(() => {

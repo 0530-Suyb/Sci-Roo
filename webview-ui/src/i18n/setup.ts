@@ -28,9 +28,16 @@ Object.entries(localeFiles).forEach(([path, module]) => {
 
 console.log("Dynamically loaded translations:", Object.keys(translations))
 
+const namespaces = Array.from(
+	new Set(Object.values(translations).flatMap((languageNamespaces) => Object.keys(languageNamespaces))),
+)
+
 // Initialize i18next for React
 // This will be initialized with the VSCode language in TranslationProvider
 i18next.use(initReactI18next).init({
+	resources: translations,
+	ns: namespaces,
+	defaultNS: namespaces.includes("common") ? "common" : namespaces[0],
 	lng: "en", // Default language (will be overridden)
 	fallbackLng: "en",
 	debug: false,
@@ -43,7 +50,9 @@ export function loadTranslations() {
 	Object.entries(translations).forEach(([lang, namespaces]) => {
 		try {
 			Object.entries(namespaces).forEach(([namespace, resources]) => {
-				i18next.addResourceBundle(lang, namespace, resources, true, true)
+				if (!i18next.hasResourceBundle(lang, namespace)) {
+					i18next.addResourceBundle(lang, namespace, resources, true, true)
+				}
 			})
 		} catch (error) {
 			console.warn(`Could not load ${lang} translations:`, error)
