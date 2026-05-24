@@ -1,5 +1,5 @@
 import type { ClineProvider } from "./ClineProvider"
-import type { WebviewMessage } from "@roo-code/types"
+import { createDefaultReadPaperWorkspaceConfig, type WebviewMessage } from "@roo-code/types"
 
 function formatReadPaperError(error: unknown): string {
 	return error instanceof Error ? error.message : String(error)
@@ -42,6 +42,22 @@ async function postState(provider: ClineProvider, selectedRetrievalNo?: string):
 	})
 }
 
+async function postWorkspaceConfig(provider: ClineProvider): Promise<void> {
+	const manager = provider.getRetrievalManager()
+	if (!manager) {
+		await provider.postMessageToWebview({
+			type: "readPaperWorkspaceConfig",
+			readPaperWorkspaceConfig: createDefaultReadPaperWorkspaceConfig(),
+		})
+		return
+	}
+
+	await provider.postMessageToWebview({
+		type: "readPaperWorkspaceConfig",
+		readPaperWorkspaceConfig: await manager.getWorkspaceConfig(),
+	})
+}
+
 export async function handleReadPaperListRetrievals(provider: ClineProvider, message: WebviewMessage): Promise<void> {
 	try {
 		prepareManager(provider, message)
@@ -61,6 +77,51 @@ export async function handleReadPaperCreateRetrieval(provider: ClineProvider, me
 		await postState(provider, retrieval.retrieval_no)
 	} catch (error) {
 		provider.log(`ReadPaper create retrieval error: ${error}`)
+		await postErrorState(provider, error)
+	}
+}
+
+export async function handleReadPaperGetWorkspaceConfig(
+	provider: ClineProvider,
+	message: WebviewMessage,
+): Promise<void> {
+	try {
+		prepareManager(provider, message)
+		await postWorkspaceConfig(provider)
+	} catch (error) {
+		provider.log(`ReadPaper get workspace config error: ${error}`)
+		await postErrorState(provider, error)
+	}
+}
+
+export async function handleReadPaperUpdateWorkspaceConfig(
+	provider: ClineProvider,
+	message: WebviewMessage,
+): Promise<void> {
+	try {
+		const manager = prepareManager(provider, message)
+		if (!manager) return
+
+		await manager.updateWorkspaceConfig((message.values?.updates ?? message.values?.config ?? {}) as any)
+		await postWorkspaceConfig(provider)
+	} catch (error) {
+		provider.log(`ReadPaper update workspace config error: ${error}`)
+		await postErrorState(provider, error)
+	}
+}
+
+export async function handleReadPaperResetWorkspaceConfig(
+	provider: ClineProvider,
+	message: WebviewMessage,
+): Promise<void> {
+	try {
+		const manager = prepareManager(provider, message)
+		if (!manager) return
+
+		await manager.resetWorkspaceConfig()
+		await postWorkspaceConfig(provider)
+	} catch (error) {
+		provider.log(`ReadPaper reset workspace config error: ${error}`)
 		await postErrorState(provider, error)
 	}
 }
@@ -146,6 +207,62 @@ export async function handleReadPaperArchiveRetrieval(provider: ClineProvider, m
 		await postState(provider, retrieval.retrieval_no)
 	} catch (error) {
 		provider.log(`ReadPaper archive retrieval error: ${error}`)
+		await postErrorState(provider, error)
+	}
+}
+
+export async function handleReadPaperDeleteRetrieval(provider: ClineProvider, message: WebviewMessage): Promise<void> {
+	try {
+		const manager = prepareManager(provider, message)
+		const retrievalNo = message.values?.retrieval_no as string | undefined
+		if (!manager || !retrievalNo) return
+
+		await manager.deleteRetrieval(retrievalNo)
+	} catch (error) {
+		provider.log(`ReadPaper delete retrieval error: ${error}`)
+		await postErrorState(provider, error)
+	}
+}
+
+export async function handleReadPaperDeleteRetrievalWithImportedEntries(
+	provider: ClineProvider,
+	message: WebviewMessage,
+): Promise<void> {
+	try {
+		const manager = prepareManager(provider, message)
+		const retrievalNo = message.values?.retrieval_no as string | undefined
+		if (!manager || !retrievalNo) return
+
+		await manager.deleteRetrievalWithImportedEntries(retrievalNo)
+	} catch (error) {
+		provider.log(`ReadPaper delete retrieval with imported entries error: ${error}`)
+		await postErrorState(provider, error)
+	}
+}
+
+export async function handleReadPaperImportCandidate(provider: ClineProvider, message: WebviewMessage): Promise<void> {
+	try {
+		const manager = prepareManager(provider, message)
+		const retrievalNo = message.values?.retrieval_no as string | undefined
+		const candidateNo = message.values?.candidate_no as string | undefined
+		if (!manager || !retrievalNo || !candidateNo) return
+
+		await manager.importCandidateToLibrary(retrievalNo, candidateNo)
+	} catch (error) {
+		provider.log(`ReadPaper import candidate error: ${error}`)
+		await postErrorState(provider, error)
+	}
+}
+
+export async function handleReadPaperImportRetrieval(provider: ClineProvider, message: WebviewMessage): Promise<void> {
+	try {
+		const manager = prepareManager(provider, message)
+		const retrievalNo = message.values?.retrieval_no as string | undefined
+		if (!manager || !retrievalNo) return
+
+		await manager.importRetrievalToLibrary(retrievalNo)
+	} catch (error) {
+		provider.log(`ReadPaper import retrieval error: ${error}`)
 		await postErrorState(provider, error)
 	}
 }

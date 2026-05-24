@@ -14,7 +14,7 @@ import { RouterName } from "@roo/api"
 
 import { useAppTranslation } from "@src/i18n/TranslationContext"
 import { VSCodeButtonLink } from "@src/components/common/VSCodeButtonLink"
-import { useExtensionState } from "@src/context/ExtensionStateContext"
+import { useExtensionState } from "@/context/ExtensionStateContext"
 import { vscode } from "@src/utils/vscode"
 import { Button } from "@src/components/ui"
 

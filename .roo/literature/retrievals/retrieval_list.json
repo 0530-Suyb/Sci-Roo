@@ -2,6 +2,50 @@
 	"schema_version": "1.0",
 	"retrievals": [
 		{
+			"retrieval_no": "retrieval_0011",
+			"title": "ReadPaper retrieval 2026-05-21",
+			"Q": "找一下近自2024年以来关于特征模理论的，发表在IEEE平台最为重大的进展",
+			"state": "未确认",
+			"created_at": "2026-05-21T11:29:35.749Z",
+			"updated_at": "2026-05-21T12:25:21.540Z",
+			"query": "(\"characteristic mode theory\" OR \"theory of characteristic modes\" OR \"characteristic modes\") AND (publisher:\"IEEE\" OR venue:\"IEEE\" OR source:\"IEEE\") AND year>=2024",
+			"sources": ["pubmed", "arxiv", "semantic-scholar", "crossref", "openalex", "dblp", "ieee-xplore", "acm-dl"],
+			"paper_count": 41
+		},
+		{
+			"retrieval_no": "retrieval_0010",
+			"title": "ReadPaper retrieval 2026-05-21",
+			"Q": "找一下近自2000年以来关于特征模理论的，发表在IEEE平台最为重大的进展",
+			"state": "未确认",
+			"created_at": "2026-05-21T11:27:14.439Z",
+			"updated_at": "2026-05-21T11:28:59.376Z",
+			"query": "(\"characteristic mode theory\" OR \"theory of characteristic modes\" OR \"characteristic modes\") AND (advance* OR progress OR development* OR review OR survey OR milestone*) AND (IEEE OR \"IEEE Transactions\" OR \"IEEE Access\" OR \"IEEE Antennas and Propagation\") AND (2000:2026[dp])",
+			"sources": ["pubmed", "arxiv"],
+			"paper_count": 3
+		},
+		{
+			"retrieval_no": "retrieval_0009",
+			"title": "ReadPaper retrieval 2026-05-20",
+			"Q": "找一下近自2000年以来关于特征模理论的，发表在IEEE平台最为重大的进展",
+			"state": "未确认",
+			"created_at": "2026-05-20T11:49:10.188Z",
+			"updated_at": "2026-05-21T04:58:03.780Z",
+			"query": "((\"Characteristic Mode Theory\" OR \"Theory of Characteristic Modes\" OR \"Characteristic Modes\")) AND (advance* OR progress OR development* OR breakthrough* OR milestone* OR review OR survey OR \"state of the art\") AND (IEEE OR \"IEEE Xplore\" OR \"IEEE Transactions\" OR \"IEEE Antennas and Propagation\") AND (journal OR \"journal article\" OR conference OR proceedings)",
+			"sources": ["pubmed", "ieee-xplore", "acm-dl", "arxiv", "semantic-scholar", "crossref", "openalex", "dblp"],
+			"paper_count": 49
+		},
+		{
+			"retrieval_no": "retrieval_0008",
+			"title": "test8",
+			"Q": "看一下bupt在语义通信最新进展",
+			"state": "未确认",
+			"created_at": "2026-05-17T13:07:44.953Z",
+			"updated_at": "2026-05-17T13:41:38.080Z",
+			"query": "((semantic communication) OR semcom OR semantic-aware communications OR task-oriented communications) AND (Beijing University of Posts and Telecommunications OR BUPT OR Beijing Univ of Posts & Telecommunications OR Beijing Univ. of Posts and Telecommunications)",
+			"sources": ["pubmed", "arxiv"],
+			"paper_count": 15
+		},
+		{
 			"retrieval_no": "retrieval_0007",
 			"title": "test7",
 			"Q": "看一下guo xing yue 在特征模理论做出的贡献",
@@ -22,61 +66,6 @@
 			"query": "(\"characteristic mode\" OR \"characteristic modes\" OR \"theory of characteristic modes\" OR TCM) AND (progress OR advance OR development OR recent OR review)",
 			"sources": ["pubmed", "arxiv"],
 			"paper_count": 10
-		},
-		{
-			"retrieval_no": "retrieval_0005",
-			"title": "test6",
-			"Q": "看一下近两年特征模理论的进展",
-			"state": "未确认",
-			"created_at": "2026-05-14T10:54:02.072Z",
-			"updated_at": "2026-05-14T10:54:37.334Z",
-			"query": "(\"characteristic mode theory\" OR \"characteristic mode analysis\" OR \"theory of characteristic modes\" OR TCM) AND (progress OR advance* OR review OR application* OR antenna* OR electromagnetic*)",
-			"sources": ["pubmed", "arxiv"],
-			"paper_count": 0
-		},
-		{
-			"retrieval_no": "retrieval_0004",
-			"title": "test5",
-			"Q": "看一下近两年特征模理论的进展",
-			"state": "未确认",
-			"created_at": "2026-05-14T10:35:49.915Z",
-			"updated_at": "2026-05-14T10:38:12.699Z",
-			"query": "",
-			"sources": ["pubmed", "arxiv"],
-			"paper_count": 0
-		},
-		{
-			"retrieval_no": "retrieval_0003",
-			"title": "test3",
-			"Q": "看一下近两年特征模理论的进展",
-			"state": "未确认",
-			"created_at": "2026-05-14T10:09:37.033Z",
-			"updated_at": "2026-05-14T10:26:43.962Z",
-			"query": "",
-			"sources": ["pubmed", "arxiv"],
-			"paper_count": 0
-		},
-		{
-			"retrieval_no": "retrieval_0002",
-			"title": "test2",
-			"Q": "看一下近两年特征模理论的进展",
-			"state": "未确认",
-			"created_at": "2026-05-14T10:02:26.065Z",
-			"updated_at": "2026-05-14T10:09:40.192Z",
-			"query": "",
-			"sources": ["pubmed", "arxiv"],
-			"paper_count": 0
-		},
-		{
-			"retrieval_no": "retrieval_0001",
-			"title": "test",
-			"Q": "看一下近两年特征模理论的进展",
-			"state": "已确认",
-			"created_at": "2026-05-14T09:52:12.839Z",
-			"updated_at": "2026-05-14T10:02:03.153Z",
-			"query": "",
-			"sources": ["pubmed", "arxiv"],
-			"paper_count": 0
 		}
 	]
 }

@@ -5,7 +5,7 @@ import { supportPrompt, SupportPromptType } from "@roo/support-prompt"
 
 import { vscode } from "@src/utils/vscode"
 import { useAppTranslation } from "@src/i18n/TranslationContext"
-import { useExtensionState } from "@src/context/ExtensionStateContext"
+import { useExtensionState } from "@/context/ExtensionStateContext"
 import {
 	Button,
 	Select,

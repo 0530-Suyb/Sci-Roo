@@ -1,5 +1,5 @@
 import { useMemo } from "react"
-import { useExtensionState } from "@src/context/ExtensionStateContext"
+import { useExtensionState } from "@/context/ExtensionStateContext"
 import { useAppTranslation } from "@src/i18n/TranslationContext"
 import { MAX_MCP_TOOLS_THRESHOLD, countEnabledMcpTools } from "@roo-code/types"
 

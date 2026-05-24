@@ -5,7 +5,17 @@ export interface Author {
 	affiliation?: string
 }
 
-export type LiteratureSource = "pubmed" | "arxiv" | "semantic-scholar" | "crossref" | "manual" | "doi-lookup"
+export type LiteratureSource =
+	| "pubmed"
+	| "arxiv"
+	| "semantic-scholar"
+	| "crossref"
+	| "openalex"
+	| "dblp"
+	| "ieee-xplore"
+	| "acm-dl"
+	| "manual"
+	| "doi-lookup"
 
 export interface LiteratureNote {
 	id: string
