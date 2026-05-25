@@ -167,6 +167,18 @@ export class LiteratureManager {
 		return { entry: updated, created: false }
 	}
 
+	findReadPaperCandidateEntry(
+		candidate: RetrievalCandidate,
+		options?: { retrievalNo?: string },
+	): LiteratureEntry | undefined {
+		const mapped = this.mapReadPaperCandidate(candidate, options)
+		const retrievalTag = options?.retrievalNo ? `readpaper:${options.retrievalNo}` : undefined
+		return this.library.entries.find((entry) => {
+			if (retrievalTag && entry.tags.includes(retrievalTag)) return true
+			return this.findDuplicateReason(entry, mapped) !== null
+		})
+	}
+
 	async addEntries(
 		entries: Array<
 			Omit<LiteratureEntry, "id" | "dateAdded" | "dateModified" | "notes"> & { notes?: LiteratureNote[] }

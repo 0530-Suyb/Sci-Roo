@@ -62,6 +62,21 @@ type UpdateRetrievalInput = Partial<Omit<CreateRetrievalInput, "search_sources">
 
 type UpdateCandidateInput = Partial<Pick<RetrievalCandidate, "state" | "notes" | "decision_reason">>
 
+type RetrievalCandidateWithReferenceStatus = RetrievalCandidate & {
+	reference_status?: {
+		libraryImported: boolean
+		hasReferenceEntry: boolean
+		hasPdf: boolean
+		libraryEntryId?: string
+		citeKey?: string
+		pdfPath?: string
+	}
+}
+
+type RetrievalTaskWithReferenceStatus = Omit<RetrievalTask, "candidates"> & {
+	candidates: RetrievalCandidateWithReferenceStatus[]
+}
+
 export class RetrievalManager {
 	private providerRef: WeakRef<ClineProvider>
 	private retrievalList: RetrievalList = { schema_version: RETRIEVAL_SCHEMA_VERSION, retrievals: [] }
@@ -126,7 +141,7 @@ export class RetrievalManager {
 
 	async getState(selectedRetrievalNo?: string): Promise<{
 		retrievals: RetrievalListItem[]
-		selectedRetrieval?: RetrievalTask
+		selectedRetrieval?: RetrievalTaskWithReferenceStatus
 		config: ReadPaperWorkspaceConfig
 	}> {
 		await this.ensureInitialized()
@@ -142,7 +157,9 @@ export class RetrievalManager {
 
 		return {
 			retrievals: this.retrievalList.retrievals,
-			selectedRetrieval,
+			selectedRetrieval: selectedRetrieval
+				? await this.withCandidateReferenceStatuses(selectedRetrieval)
+				: undefined,
 			config: this.workspaceConfig,
 		}
 	}
@@ -153,6 +170,43 @@ export class RetrievalManager {
 			await this.loadWorkspaceConfig()
 		}
 		return this.workspaceConfig
+	}
+
+	private async withCandidateReferenceStatuses(retrieval: RetrievalTask): Promise<RetrievalTaskWithReferenceStatus> {
+		const provider = this.providerRef.deref()
+		const literatureManager = provider?.getLiteratureManager()
+		const referenceManager = provider?.getReferenceManager()
+
+		if (literatureManager && !literatureManager.isInitialized) {
+			await literatureManager.initialize()
+		}
+
+		const candidates = await Promise.all(
+			retrieval.candidates.map(async (candidate): Promise<RetrievalCandidateWithReferenceStatus> => {
+				const libraryEntry = literatureManager?.findReadPaperCandidateEntry(candidate, {
+					retrievalNo: retrieval.retrieval_no,
+				})
+				const referenceStatus = referenceManager
+					? await referenceManager
+							.getReadPaperCandidateReferenceStatus(candidate, { cwd: this.cwd })
+							.catch(() => undefined)
+					: undefined
+
+				return {
+					...candidate,
+					reference_status: {
+						libraryImported: Boolean(libraryEntry),
+						hasReferenceEntry: referenceStatus?.hasEntry ?? false,
+						hasPdf: referenceStatus?.hasPdf ?? false,
+						libraryEntryId: libraryEntry?.id,
+						citeKey: referenceStatus?.citeKey,
+						pdfPath: referenceStatus?.pdfPath,
+					},
+				}
+			}),
+		)
+
+		return { ...retrieval, candidates }
 	}
 
 	async updateWorkspaceConfig(updates: Partial<ReadPaperWorkspaceConfig>): Promise<ReadPaperWorkspaceConfig> {
@@ -557,8 +611,9 @@ export class RetrievalManager {
 	async importCandidateToLibrary(
 		retrievalNo: string,
 		candidateNo: string,
+		options?: { downloadPdfToReference?: boolean },
 	): Promise<{ imported: number; updated: number; skipped: number }> {
-		return this.importRetrievalCandidatesToLibrary(retrievalNo, [candidateNo])
+		return this.importRetrievalCandidatesToLibrary(retrievalNo, [candidateNo], options)
 	}
 
 	async importRetrievalToLibrary(
@@ -570,6 +625,7 @@ export class RetrievalManager {
 	private async importRetrievalCandidatesToLibrary(
 		retrievalNo: string,
 		candidateNos?: string[],
+		options?: { downloadPdfToReference?: boolean },
 	): Promise<{ imported: number; updated: number; skipped: number }> {
 		await this.ensureInitialized()
 
@@ -603,12 +659,43 @@ export class RetrievalManager {
 			}
 		}
 
+		let referencePdf: Record<string, unknown> | undefined
+		if (options?.downloadPdfToReference) {
+			if (selectedCandidates.length !== 1) {
+				throw new Error("Reference PDF download is only supported for a single candidate")
+			}
+			const referenceManager = provider.getReferenceManager()
+			if (!referenceManager) throw new Error("Reference manager is not available")
+			const candidate = selectedCandidates[0]
+			const result = await referenceManager
+				.importReadPaperCandidate(candidate, {
+					cwd: this.cwd,
+					downloadPdf: true,
+				})
+				.catch(async (error) => {
+					await this.appendActivity("reference_pdf_download_failed", retrievalNo, {
+						candidateNo: candidate.candidate_no,
+						error: error instanceof Error ? error.message : String(error),
+					})
+					throw error
+				})
+			referencePdf = {
+				candidateNo: candidate.candidate_no,
+				citeKey: result.entry.citeKey,
+				created: result.created,
+				status: result.pdf.status,
+				path: result.pdf.path,
+				url: result.pdf.url,
+			}
+		}
+
 		const skipped = candidateNos ? Math.max(0, candidateNos.length - selectedCandidates.length) : 0
 		await this.appendActivity(candidateNos?.length === 1 ? "import_candidate" : "import_retrieval", retrievalNo, {
 			candidateNos: selectedCandidates.map((candidate) => candidate.candidate_no),
 			imported,
 			updated,
 			skipped,
+			referencePdf,
 		})
 		await this.postLiteratureState()
 		await this.postState(retrievalNo)

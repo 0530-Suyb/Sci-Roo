@@ -9,6 +9,7 @@ import {
 	ChevronRight,
 	ChevronDown,
 	CircleSlash,
+	Download,
 	ExternalLink,
 	FileSearch,
 	Library,
@@ -89,6 +90,14 @@ type RetrievalCandidate = {
 	discovery_sources?: string[]
 	match_evidence?: string[]
 	metadata_warnings?: string[]
+	reference_status?: {
+		libraryImported?: boolean
+		hasReferenceEntry?: boolean
+		hasPdf?: boolean
+		libraryEntryId?: string
+		citeKey?: string
+		pdfPath?: string
+	}
 }
 
 type Retrieval = {
@@ -190,6 +199,15 @@ const normalizeExternalUrl = (value: string | undefined) => {
 	return ""
 }
 
+const LEGACY_ARXIV_ID_PATTERN = String.raw`[a-z-]+(?:\.[A-Z]{2})?/\d{7}(?:v\d+)?`
+const MODERN_ARXIV_ID_PATTERN = String.raw`\d{4}\.\d{4,5}(?:v\d+)?`
+const ARXIV_ID_PATTERN = String.raw`(?:${LEGACY_ARXIV_ID_PATTERN}|${MODERN_ARXIV_ID_PATTERN})`
+const STRICT_ARXIV_ID_PATTERN = new RegExp(String.raw`^${ARXIV_ID_PATTERN}$`, "i")
+const EXPLICIT_ARXIV_ID_PATTERN = new RegExp(
+	String.raw`(?:arxiv(?:\.org/(?:abs|pdf)/|/(?:abs|pdf)/|:|\.)\s*)(${ARXIV_ID_PATTERN})(?:\.pdf)?`,
+	"i",
+)
+
 const buildCandidateUrl = (candidate: RetrievalCandidate) => {
 	const directUrl = normalizeExternalUrl(candidate.url)
 	if (directUrl) return directUrl
@@ -198,6 +216,19 @@ const buildCandidateUrl = (candidate: RetrievalCandidate) => {
 	if (candidate.arxiv_id?.trim()) return `https://arxiv.org/abs/${encodeURIComponent(candidate.arxiv_id.trim())}`
 	return ""
 }
+
+const hasArxivIdentifier = (value: string | undefined, allowBareId = false) => {
+	const trimmed = value?.trim()
+	if (!trimmed) return false
+	if (EXPLICIT_ARXIV_ID_PATTERN.test(trimmed)) return true
+	return allowBareId && STRICT_ARXIV_ID_PATTERN.test(trimmed.replace(/\.pdf$/i, ""))
+}
+
+const hasArxivInfo = (candidate: RetrievalCandidate) =>
+	hasArxivIdentifier(candidate.arxiv_id, true) ||
+	hasArxivIdentifier(candidate.source_id, candidate.source === "arxiv") ||
+	hasArxivIdentifier(candidate.url) ||
+	hasArxivIdentifier(candidate.doi)
 
 const toOptionalNumber = (value: string) => {
 	if (!value.trim()) return undefined
@@ -333,6 +364,7 @@ const ReadPaperView: React.FC<ReadPaperViewProps> = ({ onDone }) => {
 	const [hasSyncedEmptyDraft, setHasSyncedEmptyDraft] = useState(false)
 	const [pendingDeleteRetrievalNo, setPendingDeleteRetrievalNo] = useState<string | null>(null)
 	const [expandedCandidateAbstracts, setExpandedCandidateAbstracts] = useState<Record<string, boolean>>({})
+	const [archiveMenuCandidateNo, setArchiveMenuCandidateNo] = useState<string | null>(null)
 
 	useEffect(() => {
 		vscode.postMessage({ type: "readPaperListRetrievals", values: { cwd } })
@@ -605,11 +637,16 @@ const ReadPaperView: React.FC<ReadPaperViewProps> = ({ onDone }) => {
 		vscode.postMessage({ type: "readPaperImportRetrieval", values: { retrieval_no: retrievalNo, cwd } })
 	}
 
-	const importCandidate = (candidateNo: string) => {
+	const importCandidate = (candidateNo: string, downloadPdfToReference = false) => {
 		if (!selectedRetrieval || !candidateNo) return
 		vscode.postMessage({
 			type: "readPaperImportCandidate",
-			values: { retrieval_no: selectedRetrieval.retrieval_no, candidate_no: candidateNo, cwd },
+			values: {
+				retrieval_no: selectedRetrieval.retrieval_no,
+				candidate_no: candidateNo,
+				cwd,
+				download_pdf_to_reference: downloadPdfToReference,
+			},
 		})
 	}
 
@@ -623,6 +660,12 @@ const ReadPaperView: React.FC<ReadPaperViewProps> = ({ onDone }) => {
 
 	const toggleCandidateAbstract = (candidateNo: string) => {
 		setExpandedCandidateAbstracts((current) => ({ ...current, [candidateNo]: !current[candidateNo] }))
+	}
+
+	const closeArchiveMenuOnBlur = (event: React.FocusEvent<HTMLDivElement>) => {
+		if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+			setArchiveMenuCandidateNo(null)
+		}
 	}
 
 	const openCandidateUrl = (candidate: RetrievalCandidate) => {
@@ -1245,7 +1288,7 @@ const ReadPaperView: React.FC<ReadPaperViewProps> = ({ onDone }) => {
 				</div>
 			)}
 
-			<div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+			<div className="min-w-0 space-y-4">
 				<section className="min-w-0 space-y-4">
 					<div className="rounded-md border border-vscode-panel-border p-4">
 						<div className="flex items-center justify-between gap-2">
@@ -1709,6 +1752,13 @@ const ReadPaperView: React.FC<ReadPaperViewProps> = ({ onDone }) => {
 						{selectedRetrieval?.candidates?.map((candidate) => {
 							const candidateUrl = buildCandidateUrl(candidate)
 							const isAbstractOpen = Boolean(expandedCandidateAbstracts[candidate.candidate_no])
+							const candidateSupportsArxivDownload = hasArxivInfo(candidate)
+							const candidateIsArchived = Boolean(candidate.reference_status?.libraryImported)
+							const candidateHasReferencePdf = Boolean(candidate.reference_status?.hasPdf)
+							const candidateNeedsReferenceDownload =
+								candidateSupportsArxivDownload && candidateIsArchived && !candidateHasReferencePdf
+							const candidatePdfAlreadyDownloaded =
+								candidateSupportsArxivDownload && candidateIsArchived && candidateHasReferencePdf
 
 							return (
 								<article
@@ -1855,15 +1905,96 @@ const ReadPaperView: React.FC<ReadPaperViewProps> = ({ onDone }) => {
 													<CircleSlash className="h-4 w-4" />
 												</Button>
 											</StandardTooltip>
-											<StandardTooltip content="Import candidate to library">
-												<Button
-													variant="outline"
-													size="icon"
-													aria-label="Import candidate"
-													onClick={() => importCandidate(candidate.candidate_no)}>
-													<BookPlus className="h-4 w-4" />
-												</Button>
-											</StandardTooltip>
+											{candidateNeedsReferenceDownload ? (
+												<StandardTooltip content="下载 PDF 到 reference/">
+													<Button
+														variant="outline"
+														size="sm"
+														aria-label="下载 PDF 到 reference/"
+														onClick={() => importCandidate(candidate.candidate_no, true)}>
+														<Download className="h-4 w-4" />
+														<span>下载</span>
+													</Button>
+												</StandardTooltip>
+											) : candidatePdfAlreadyDownloaded ? (
+												<StandardTooltip content="PDF 已在 reference/">
+													<Button
+														variant="outline"
+														size="sm"
+														aria-label="PDF 已在 reference/"
+														disabled>
+														<Download className="h-4 w-4" />
+														<span>已下载</span>
+													</Button>
+												</StandardTooltip>
+											) : candidateSupportsArxivDownload ? (
+												<div
+													className="relative"
+													onMouseEnter={() =>
+														setArchiveMenuCandidateNo(candidate.candidate_no)
+													}
+													onMouseLeave={() => setArchiveMenuCandidateNo(null)}
+													onFocus={() => setArchiveMenuCandidateNo(candidate.candidate_no)}
+													onBlur={closeArchiveMenuOnBlur}>
+													<StandardTooltip content="归档选项">
+														<Button
+															variant="outline"
+															size="icon"
+															aria-label="归档选项"
+															aria-haspopup="menu"
+															aria-expanded={
+																archiveMenuCandidateNo === candidate.candidate_no
+															}
+															onClick={() =>
+																setArchiveMenuCandidateNo((current) =>
+																	current === candidate.candidate_no
+																		? null
+																		: candidate.candidate_no,
+																)
+															}>
+															<BookPlus className="h-4 w-4" />
+														</Button>
+													</StandardTooltip>
+													{archiveMenuCandidateNo === candidate.candidate_no && (
+														<div
+															role="menu"
+															className="absolute right-0 top-full z-50 min-w-52 overflow-hidden rounded-md border border-vscode-focusBorder bg-vscode-dropdown-background p-1 text-vscode-dropdown-foreground shadow-lg">
+															<button
+																type="button"
+																role="menuitem"
+																className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-vscode-list-hoverBackground focus:bg-vscode-list-activeSelectionBackground focus:text-vscode-list-activeSelectionForeground focus:outline-none"
+																onClick={() => {
+																	importCandidate(candidate.candidate_no)
+																	setArchiveMenuCandidateNo(null)
+																}}>
+																<BookPlus className="h-4 w-4 shrink-0" />
+																<span>归档</span>
+															</button>
+															<button
+																type="button"
+																role="menuitem"
+																className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-vscode-list-hoverBackground focus:bg-vscode-list-activeSelectionBackground focus:text-vscode-list-activeSelectionForeground focus:outline-none"
+																onClick={() => {
+																	importCandidate(candidate.candidate_no, true)
+																	setArchiveMenuCandidateNo(null)
+																}}>
+																<Download className="h-4 w-4 shrink-0" />
+																<span>归档并下载到 reference/</span>
+															</button>
+														</div>
+													)}
+												</div>
+											) : (
+												<StandardTooltip content="Import candidate to library">
+													<Button
+														variant="outline"
+														size="icon"
+														aria-label="Import candidate"
+														onClick={() => importCandidate(candidate.candidate_no)}>
+														<BookPlus className="h-4 w-4" />
+													</Button>
+												</StandardTooltip>
+											)}
 										</div>
 									</div>
 								</article>

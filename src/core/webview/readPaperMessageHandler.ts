@@ -245,9 +245,12 @@ export async function handleReadPaperImportCandidate(provider: ClineProvider, me
 		const manager = prepareManager(provider, message)
 		const retrievalNo = message.values?.retrieval_no as string | undefined
 		const candidateNo = message.values?.candidate_no as string | undefined
+		const downloadPdfToReference = message.values?.download_pdf_to_reference === true
 		if (!manager || !retrievalNo || !candidateNo) return
 
-		await manager.importCandidateToLibrary(retrievalNo, candidateNo)
+		await manager.importCandidateToLibrary(retrievalNo, candidateNo, {
+			downloadPdfToReference,
+		})
 	} catch (error) {
 		provider.log(`ReadPaper import candidate error: ${error}`)
 		await postErrorState(provider, error)
