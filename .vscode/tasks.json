@@ -18,6 +18,11 @@
 			"label": "watch:webview",
 			"type": "shell",
 			"command": "pnpm --filter @roo-code/vscode-webview dev",
+			"options": {
+				"env": {
+					"PATH": "${workspaceFolder}\\.tools\\node-v20.19.2-win-x64;${env:PATH}"
+				}
+			},
 			"group": "build",
 			"problemMatcher": {
 				"owner": "vite",
@@ -40,6 +45,11 @@
 			"label": "watch:bundle",
 			"type": "shell",
 			"command": "npx turbo watch:bundle",
+			"options": {
+				"env": {
+					"PATH": "${workspaceFolder}\\.tools\\node-v20.19.2-win-x64;${env:PATH}"
+				}
+			},
 			"group": "build",
 			"problemMatcher": {
 				"owner": "esbuild",
@@ -62,6 +72,11 @@
 			"label": "watch:tsc",
 			"type": "shell",
 			"command": "npx turbo watch:tsc",
+			"options": {
+				"env": {
+					"PATH": "${workspaceFolder}\\.tools\\node-v20.19.2-win-x64;${env:PATH}"
+				}
+			},
 			"group": "build",
 			"problemMatcher": "$tsc-watch",
 			"isBackground": true,
