@@ -1,6 +1,8 @@
 # ReadPaper 重构方案与当前状态
 
-> 目标：把 ReadPaper 固定为一个 `workspace-configurable`、确定性执行的文献检索工作区。检索闭环由后端 job 完成；AI 只作为 optional planner，用于把自然语言 request 翻成英文 query / search plan，不承担 task 编排、交互、保存或入库。
+> 文档角色：这是 `Read Paper Workspace` 的产品/架构重构提案，主要说明为什么这样改、要改成什么样。  
+> 它不是面向终端用户的使用手册；使用说明请看根目录下的 [README - read paper workspace.md](<../README - read paper workspace.md>)。  
+> 目标：把 ReadPaper 固定为一个 `workspace-configurable`、确定性执行的文献检索工作区。检索闭环由后端 job 完成；AI 只作为 optional planner，用于把自然语言 request 翻成英文 query / search plan，不承担 task 编排、交互、保存或入库。  
 > 更新时间：2026-05-20。
 
 ## 1. 当前结论

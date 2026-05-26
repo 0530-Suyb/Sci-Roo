@@ -1,5 +1,7 @@
 # 当前工具调用流程说明
 
+> 文档角色：这是开发参考文档，用来说明当前工具和 ReadPaper retrieval job 的调用链路。  
+> 如果你在找产品用法，请优先看根目录下的 workspace README；如果你在找 ReadPaper 方案背景，请看本目录下的 `readpaper-retrieval-plan.md` 和 `readpaper-redesign-proposal.md`。  
 > 适用范围：当前 `dev` 分支的实现。  
 > 目的：把普通任务和 ReadPaper retrieval job 的调用链路拆开，说明当前工具是怎么被触发、执行、回写和持久化的。
 

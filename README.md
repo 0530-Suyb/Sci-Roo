@@ -1,158 +1,94 @@
 # Sci-Roo
 
-Sci-Roo 是一个面向科研工作流的 VS Code AI 扩展，覆盖从研究问题澄清、文献阅读、实验分析到论文写作和同行评审的完整链路。
+Sci-Roo 是一个面向科研工作流的 VS Code 扩展。它基于 Roo Code 扩展出一组研究专用模式与工作区，把研究问题澄清、文献检索、数据分析、可视化、论文写作和同行评审串成一条更清晰的科研流程。
 
-## 最新工作区更新
+## What This Repo Contains
 
-最近一轮围绕科研工作流做了几项重要调整：
+这个仓库是一个 `pnpm` monorepo，核心目录如下：
 
-- `Research Pipeline` 已改为默认首页，不再由原来的 `New Task` 作为初始进入面板
-- 原 `New Task` 现在面向用户统一命名为 `Agent Chat`
-- 项目初始化入口统一收敛到 `Research Pipeline > Project Workspace`
-- Sci-Roo 现在只允许在当前 VS Code 打开的根目录内初始化和工作
-- `Research Pipeline` 会在项目创建后显示独立的 `Agent Chat`、`Read Paper`、`Data Studio`、`Paper Writing` 状态卡片
-- `Agent Chat` 卡片默认进入 `sci-problem-framing` mode，并自动基于项目 description 发起“先研究问题、后文章规划”的引导对话
-- 项目创建时填写的 `description` 会写入 `problem/research-questions.md` 开头，并作为后续研究问题澄清的背景
+- `src/`: VS Code 扩展后端
+- `webview-ui/`: React webview 前端
+- `packages/`: 共享类型、核心库、遥测、evals
+- `apps/`: CLI、Web、E2E 等独立应用
+- `docs/`: 产品文档、开发者文档、设计记录
 
-补充文档：
+## Quick Start For Developers
 
-- [README - research pipeline workspace.md](<README - research pipeline workspace.md>)
-- [README - paper writing workspace.md](<README - paper writing workspace.md>)
-- [finished.md](finished.md)
+### 1. 环境要求
 
-## 产品定位
+- Node.js `20.19.2`
+- `pnpm@10`
+- VS Code
 
-Sci-Roo 的核心目标是把科研工作流拆成清晰协作的几个阶段：
+### 2. 安装依赖
 
-1. 明确研究问题
-2. 阅读和组织相关文献
-3. 设计实验与分析方案
-4. 执行分析和生成结果
-5. 撰写与修订论文
+```bash
+pnpm install
+```
 
-当前更推荐的使用路径是：
-
-1. 打开一个 VS Code 根目录
-2. 进入 `Research Pipeline`
-3. 在 `Project Workspace` 中初始化当前根目录
-4. 点击 `Agent Chat`，先澄清研究问题
-5. 逐步形成：
-    - `problem/research-questions.md`
-    - `task/paper-plan.md`
-6. 再进入：
-    - `Read Paper`
-    - `Data Studio`
-    - `Paper Writing`
-
-## 内置科研模式
-
-当前内置 7 个科研模式：
-
-| slug                  | 模式名                   | 作用                           |
-| --------------------- | ------------------------ | ------------------------------ |
-| `sci-lit-review`      | Literature Review        | 搜索、评估和整理文献           |
-| `sci-hyp-design`      | Hypothesis & Design      | 假设设计与实验规划             |
-| `sci-problem-framing` | Research Problem Framing | 先澄清研究问题，再整理文章规划 |
-| `sci-data-analysis`   | Data Analysis            | 数据分析、统计检验与复现脚本   |
-| `sci-visualization`   | Visualization            | 生成论文级图表                 |
-| `sci-paper-writing`   | Paper Writing            | manuscript 写作与修订          |
-| `sci-peer-review`     | Peer Review              | 同行评审与回复意见             |
-
-其中新增的 `sci-problem-framing` 专门用于：
-
-- 从项目 description 出发
-- 通过偏苏格拉底式提问先澄清研究问题
-- 先写 `problem/research-questions.md`
-- 再形成 `task/paper-plan.md`
-
-## 当前工作区结构
-
-### Research Pipeline
-
-`Research Pipeline` 是默认首页，负责：
-
-- 初始化当前 VS Code 根目录
-- 展示研究流程卡片
-- 启动问题澄清型 `Agent Chat`
-- 作为 `Read Paper`、`Data Studio`、`Paper Writing` 的统一入口
-
-### Agent Chat
-
-`Agent Chat` 是原 `New Task` 的新名称。
-
-从 `Research Pipeline` 进入时，它会：
-
-- 默认切到 `sci-problem-framing`
-- 自动带上项目上下文发起对话
-- 先帮助用户梳理研究问题，再进入文章规划
-
-### Paper Writing Workspace
-
-`Paper Writing Workspace` 现在主要负责：
-
-- manuscript 写作状态
-- 引用与 `.bib` 检查
-- revision log
-- 选中文本的局部 AI 改写
-
-它不再是项目创建主入口。
-
-## 代码结构
-
-这是一个 pnpm monorepo，主要目录包括：
-
-- `src/`
-    - VS Code 扩展后端
-- `webview-ui/`
-    - React webview 前端
-- `packages/`
-    - 共享类型、核心逻辑、telemetry 等
-- `apps/`
-    - CLI、Web、E2E 等独立应用
-- `.roo/`
-    - 规则、skills、科研模式相关资产
-
-与本轮工作最相关的目录：
-
-- `src/services/research-pipeline/`
-- `src/services/paper/`
-- `src/core/webview/`
-- `webview-ui/src/components/research/`
-- `webview-ui/src/components/paper/`
-- `webview-ui/src/components/chat/`
-
-## 本轮新增或重要调整的能力
-
-- `Project Workspace` 卡片只围绕当前 VS Code 根目录工作
-- 项目创建时会初始化：
-    - `.roo/project.json`
-    - `problem/research-questions.md`
-    - `task/paper-plan.md`
-- 项目 description 会展示在 `Project Workspace` 卡片中
-- `Agent Chat` 卡片点击后自动进入 `sci-problem-framing` 并起一轮引导式对话
-- 移除了无效的 `paperProjectOpen` 消息链
-- 修复了 `ExtensionStateContext` 重复实例化问题
-- 修复了 `Agent Chat` 自动起聊时 `ChatTextArea` 的 `trim()` 崩溃问题
-
-## 构建与验证
-
-常用命令：
+### 3. 常用检查命令
 
 ```bash
 pnpm build
-pnpm exec tsc -p webview-ui/tsconfig.json --noEmit
-pnpm exec tsc -p src/tsconfig.json --noEmit
+pnpm check-types
+pnpm lint
+pnpm test
 ```
 
-开发扩展：
+### 4. 本地调试扩展
+
+在 VS Code 中打开仓库后，直接按 `F5` 启动 extension development host。
+
+如果你更偏向命令行安装 VSIX，也可以使用：
 
 ```bash
-code --extensionDevelopmentPath="./src" .
+pnpm install:vsix
 ```
 
-## 相关文档
+## Read This First
 
-- [README - research pipeline workspace.md](<README - research pipeline workspace.md>)
-- [README - paper writing workspace.md](<README - paper writing workspace.md>)
-- [finished.md](finished.md)
-- [AGENTS.md](AGENTS.md)
+如果你是第一次接触这个工程，推荐按这个顺序阅读：
+
+1. [开发者上手指南](docs/dev/onboarding.md)
+2. [文档地图](docs/README.md)
+3. 你要改动的工作区说明
+    - [Research Pipeline Workspace](<README - research pipeline workspace.md>)
+    - [Read Paper Workspace](<README - read paper workspace.md>)
+    - [Paper Writing Workspace](<README - paper writing workspace.md>)
+
+## Product Model
+
+当前产品主流程围绕 4 个入口组织：
+
+- `Research Pipeline`
+    - 项目初始化与前期研究规划
+- `Agent Chat`
+    - 配合 `sci-problem-framing` 等模式澄清研究问题
+- `Read Paper Workspace`
+    - 文献检索、候选筛选、入库准备
+- `Paper Writing Workspace`
+    - manuscript 写作辅助、引用检查、revision 支持
+
+Sci-Roo 额外提供 7 个研究模式：
+
+| Slug                  | Mode                | Purpose                      |
+| --------------------- | ------------------- | ---------------------------- |
+| `sci-lit-review`      | Literature Review   | 搜索、评估、综合文献         |
+| `sci-hyp-design`      | Hypothesis & Design | 假设设计、实验设计、功效分析 |
+| `sci-problem-framing` | Problem Framing     | 先澄清研究问题，再规划论文   |
+| `sci-data-analysis`   | Data Analysis       | 强调严谨与可复现的数据分析   |
+| `sci-visualization`   | Visualization       | 生成论文级图表               |
+| `sci-paper-writing`   | Paper Writing       | manuscript 写作与投稿准备    |
+| `sci-peer-review`     | Peer Review         | 评审与修回支持               |
+
+## Docs Map
+
+- [docs/dev/onboarding.md](docs/dev/onboarding.md): 第一次接手本仓库时先看
+- [docs/README.md](docs/README.md): 文档分层与阅读路径
+- [AGENTS.md](AGENTS.md): 给 AI agent 的仓库规则，不是开发者主入口
+- [CONTRIBUTING.md](CONTRIBUTING.md): 通用贡献流程
+
+## Notes
+
+- 当前仓库继承了 Roo Code 的 monorepo 基础设施，因此部分脚本、贡献流程与目录会保留 Roo Code 的约定。
+- 如果你在修改 `SettingsView`，输入必须绑定本地 `cachedState`，不要直接绑定 live `useExtensionState()`。这是仓库里的重要开发约束。

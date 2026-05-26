@@ -1,6 +1,8 @@
 # ReadPaper Retrieval 技术方案
 
-> 本文描述当前 ReadPaper retrieval 实现。名词、字段名和代码概念保留英文，解析性说明使用中文。
+> 文档角色：这是 `Read Paper Workspace` 的 retrieval 技术方案与实现说明，面向开发和维护。  
+> 如果你想了解普通用户应如何使用该工作区，请优先阅读根目录下的 [README - read paper workspace.md](<../README - read paper workspace.md>)。  
+> 名词、字段名和代码概念保留英文，解析性说明使用中文。
 
 ## 1. Goal
 
