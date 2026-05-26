@@ -1,7 +1,60 @@
 import * as fs from "fs/promises"
 import * as path from "path"
 import type { ClineProvider } from "../../core/webview/ClineProvider"
-import type { ReferenceEntry, Author } from "@roo-code/types"
+import type { ReferenceEntry, Author, RetrievalCandidate } from "@roo-code/types"
+
+const LEGACY_ARXIV_ID_PATTERN = String.raw`[a-z-]+(?:\.[A-Z]{2})?/\d{7}(?:v\d+)?`
+const MODERN_ARXIV_ID_PATTERN = String.raw`\d{4}\.\d{4,5}(?:v\d+)?`
+const ARXIV_ID_PATTERN = String.raw`(?:${LEGACY_ARXIV_ID_PATTERN}|${MODERN_ARXIV_ID_PATTERN})`
+const STRICT_ARXIV_ID_PATTERN = new RegExp(String.raw`^${ARXIV_ID_PATTERN}$`, "i")
+const EXPLICIT_ARXIV_ID_PATTERN = new RegExp(
+	String.raw`(?:arxiv(?:\.org/(?:abs|pdf)/|/(?:abs|pdf)/|:|\.)\s*)(${ARXIV_ID_PATTERN})(?:\.pdf)?`,
+	"i",
+)
+const PDF_MAGIC = "%PDF"
+const PDF_DOWNLOAD_USER_AGENT = "Sci-Roo/0.0.1 (ReadPaper reference PDF downloader)"
+
+export type ReferencePdfDownloadStatus = "downloaded" | "existing" | "skipped"
+
+export type ReferencePdfImportResult = {
+	entry: ReferenceEntry
+	created: boolean
+	pdf: {
+		status: ReferencePdfDownloadStatus
+		path?: string
+		url?: string
+	}
+}
+
+export type ReadPaperCandidateReferenceStatus = {
+	hasEntry: boolean
+	hasPdf: boolean
+	citeKey?: string
+	pdfPath?: string
+}
+
+export function extractArxivIdFromCandidate(candidate: Partial<RetrievalCandidate>): string | undefined {
+	const values = [
+		{ value: candidate.arxiv_id, allowBareId: true },
+		{ value: candidate.source_id, allowBareId: candidate.source === "arxiv" },
+		{ value: candidate.url },
+		{ value: candidate.doi },
+	]
+
+	for (const { value, allowBareId } of values) {
+		const normalized = normalizeArxivId(value, { allowBareId })
+		if (normalized) return normalized
+	}
+
+	return undefined
+}
+
+export function buildArxivPdfUrl(arxivId: string): string {
+	const normalized = normalizeArxivId(arxivId, { allowBareId: true })
+	if (!normalized) throw new Error(`Invalid arXiv id: ${arxivId}`)
+	const encoded = normalized.split("/").map(encodeURIComponent).join("/")
+	return `https://arxiv.org/pdf/${encoded}`
+}
 
 /**
  * Manages the reference/ directory — entry storage, citation scanning,
@@ -24,18 +77,18 @@ export class ReferenceManager {
 
 	// ─── Path Helpers ──────────────────────────────────────────────────
 
-	private getReferenceDir(): string {
-		const cwd = this.cwd
+	private getReferenceDir(cwdOverride?: string): string {
+		const cwd = cwdOverride || this.cwd
 		if (!cwd) throw new Error("No workspace directory")
 		return path.join(cwd, "reference")
 	}
 
-	private mdPath(citeKey: string): string {
-		return path.join(this.getReferenceDir(), `${citeKey}.md`)
+	private mdPath(citeKey: string, cwdOverride?: string): string {
+		return path.join(this.getReferenceDir(cwdOverride), `${citeKey}.md`)
 	}
 
-	private pdfPath(citeKey: string): string {
-		return path.join(this.getReferenceDir(), `${citeKey}.pdf`)
+	private pdfPath(citeKey: string, cwdOverride?: string): string {
+		return path.join(this.getReferenceDir(cwdOverride), `${citeKey}.pdf`)
 	}
 
 	// ─── citeKey Generation ────────────────────────────────────────────
@@ -53,10 +106,10 @@ export class ReferenceManager {
 		return `${firstAuthor}${year}${firstTitleWord}`
 	}
 
-	async resolveCiteKey(baseKey: string): Promise<string> {
+	async resolveCiteKey(baseKey: string, cwdOverride?: string): Promise<string> {
 		let key = baseKey
 		let suffix = 2
-		const refDir = this.getReferenceDir()
+		const refDir = this.getReferenceDir(cwdOverride)
 		while (true) {
 			try {
 				await fs.access(path.join(refDir, `${key}.md`))
@@ -84,10 +137,78 @@ export class ReferenceManager {
 			dateAdded: new Date().toISOString(),
 		}
 
-		const mdContent = this.serializeEntry(full)
-		await fs.writeFile(this.mdPath(entry.citeKey), mdContent, "utf-8")
+		await this.writeEntry(full)
 
 		return full
+	}
+
+	async importReadPaperCandidate(
+		candidate: RetrievalCandidate,
+		options: {
+			cwd?: string
+			downloadPdf?: boolean
+			fetchImpl?: typeof fetch
+		} = {},
+	): Promise<ReferencePdfImportResult> {
+		const cwd = options.cwd
+		const arxivId = extractArxivIdFromCandidate(candidate)
+		const entryDraft = this.candidateToReferenceEntry(candidate, arxivId)
+		const existing = await this.findDuplicateEntry(entryDraft, cwd)
+		let entry = existing ? this.mergeReferenceEntry(existing, entryDraft) : entryDraft
+		let created = false
+
+		if (!existing) {
+			entry = {
+				...entry,
+				citeKey: await this.resolveCiteKey(entry.citeKey, cwd),
+			}
+			created = true
+		}
+
+		const refDir = this.getReferenceDir(cwd)
+		await fs.mkdir(refDir, { recursive: true })
+		entry = { ...entry, hasPdf: await this.checkFileExists(this.pdfPath(entry.citeKey, cwd)) }
+
+		if (!options.downloadPdf) {
+			await this.writeEntry(entry, cwd)
+			return { entry, created, pdf: { status: "skipped" } }
+		}
+
+		if (!arxivId) {
+			throw new Error("Cannot download reference PDF: candidate has no arXiv id")
+		}
+
+		const pdfResult = await this.downloadArxivPdf(arxivId, entry.citeKey, {
+			cwd,
+			fetchImpl: options.fetchImpl,
+		})
+		if (pdfResult.status === "downloaded" || pdfResult.status === "existing") {
+			entry = { ...entry, hasPdf: true }
+		}
+		await this.writeEntry(entry, cwd)
+
+		return { entry, created, pdf: pdfResult }
+	}
+
+	async getReadPaperCandidateReferenceStatus(
+		candidate: RetrievalCandidate,
+		options: { cwd?: string } = {},
+	): Promise<ReadPaperCandidateReferenceStatus> {
+		const arxivId = extractArxivIdFromCandidate(candidate)
+		const entryDraft = this.candidateToReferenceEntry(candidate, arxivId)
+		const existing = await this.findDuplicateEntry(entryDraft, options.cwd)
+		if (!existing) {
+			return { hasEntry: false, hasPdf: false }
+		}
+
+		const pdfPath = this.pdfPath(existing.citeKey, options.cwd)
+		const hasPdf = await this.checkFileExists(pdfPath)
+		return {
+			hasEntry: true,
+			hasPdf,
+			citeKey: existing.citeKey,
+			pdfPath: hasPdf ? pdfPath : undefined,
+		}
 	}
 
 	async removeEntry(citeKey: string): Promise<void> {
@@ -108,8 +229,8 @@ export class ReferenceManager {
 		}
 	}
 
-	async listEntries(): Promise<ReferenceEntry[]> {
-		const refDir = this.getReferenceDir()
+	async listEntries(cwdOverride?: string): Promise<ReferenceEntry[]> {
+		const refDir = this.getReferenceDir(cwdOverride)
 		const entries: ReferenceEntry[] = []
 		try {
 			const files = await fs.readdir(refDir)
@@ -470,6 +591,31 @@ export class ReferenceManager {
 		})
 	}
 
+	private parseReadPaperAuthor(author: string): Author {
+		const normalized = author.trim()
+		if (!normalized) {
+			return { firstName: "", lastName: "" }
+		}
+
+		if (normalized.includes(",")) {
+			const [lastName, ...rest] = normalized.split(",")
+			return {
+				firstName: rest.join(",").trim(),
+				lastName: lastName.trim(),
+			}
+		}
+
+		const parts = normalized.split(/\s+/)
+		if (parts.length === 1) {
+			return { firstName: "", lastName: parts[0] }
+		}
+
+		return {
+			firstName: parts.slice(0, -1).join(" "),
+			lastName: parts[parts.length - 1],
+		}
+	}
+
 	// ─── Utilities ─────────────────────────────────────────────────────
 
 	private async checkFileExists(filePath: string): Promise<boolean> {
@@ -480,4 +626,147 @@ export class ReferenceManager {
 			return false
 		}
 	}
+
+	private candidateToReferenceEntry(candidate: RetrievalCandidate, arxivId?: string): ReferenceEntry {
+		const authors = candidate.authors.map((author) => this.parseReadPaperAuthor(author))
+		const year = candidate.year ?? new Date().getFullYear()
+		const draft = {
+			title: candidate.title || "(untitled reference)",
+			authors,
+			year,
+		}
+		const citeKey = this.generateCiteKey(draft)
+
+		return {
+			citeKey,
+			title: draft.title,
+			authors,
+			year,
+			venue: candidate.venue || (arxivId ? "arXiv" : ""),
+			doi: candidate.doi || undefined,
+			arxivId,
+			abstract: candidate.abstract || undefined,
+			keywords: [...new Set(candidate.keywords.filter((keyword) => Boolean(keyword)))],
+			bibtex: undefined,
+			hasPdf: false,
+			verified: Boolean(candidate.doi || arxivId),
+			verifiedAt: candidate.doi || arxivId ? new Date().toISOString() : undefined,
+			tags: ["readpaper", arxivId ? "arxiv" : ""].filter(Boolean),
+			dateAdded: new Date().toISOString(),
+		}
+	}
+
+	private async findDuplicateEntry(entry: ReferenceEntry, cwdOverride?: string): Promise<ReferenceEntry | undefined> {
+		const entries = await this.listEntries(cwdOverride)
+		const normalizedTitle = normalizeTitle(entry.title)
+
+		return entries.find((existing) => {
+			if (entry.doi && existing.doi && normalizeIdentifier(entry.doi) === normalizeIdentifier(existing.doi)) {
+				return true
+			}
+			if (
+				entry.arxivId &&
+				existing.arxivId &&
+				normalizeIdentifier(entry.arxivId) === normalizeIdentifier(existing.arxivId)
+			) {
+				return true
+			}
+			return normalizedTitle.length > 0 && normalizedTitle === normalizeTitle(existing.title)
+		})
+	}
+
+	private mergeReferenceEntry(existing: ReferenceEntry, incoming: ReferenceEntry): ReferenceEntry {
+		return {
+			...existing,
+			title: incoming.title || existing.title,
+			authors: incoming.authors.length > 0 ? incoming.authors : existing.authors,
+			year: incoming.year || existing.year,
+			venue: incoming.venue || existing.venue,
+			doi: incoming.doi || existing.doi,
+			arxivId: incoming.arxivId || existing.arxivId,
+			abstract: incoming.abstract || existing.abstract,
+			keywords: uniqueStrings([...(existing.keywords ?? []), ...(incoming.keywords ?? [])]),
+			bibtex: existing.bibtex || incoming.bibtex,
+			tags: uniqueStrings([...(existing.tags ?? []), ...(incoming.tags ?? [])]),
+			verified: existing.verified || incoming.verified,
+			verifiedAt: existing.verifiedAt || incoming.verifiedAt,
+		}
+	}
+
+	private async downloadArxivPdf(
+		arxivId: string,
+		citeKey: string,
+		options: { cwd?: string; fetchImpl?: typeof fetch } = {},
+	): Promise<ReferencePdfImportResult["pdf"]> {
+		const pdfPath = this.pdfPath(citeKey, options.cwd)
+		if (await this.checkFileExists(pdfPath)) {
+			return { status: "existing", path: pdfPath, url: buildArxivPdfUrl(arxivId) }
+		}
+
+		const url = buildArxivPdfUrl(arxivId)
+		const fetchImpl = options.fetchImpl ?? globalThis.fetch
+		if (typeof fetchImpl !== "function") {
+			throw new Error("Cannot download reference PDF: fetch is not available")
+		}
+
+		const response = await fetchImpl(url, { headers: { "User-Agent": PDF_DOWNLOAD_USER_AGENT } })
+		if (!response.ok) {
+			throw new Error(`arXiv PDF download failed: HTTP ${response.status} ${response.statusText}`)
+		}
+
+		const bytes = Buffer.from(await response.arrayBuffer())
+		if (!isPdfBuffer(bytes)) {
+			const contentType = response.headers.get("content-type") || "unknown"
+			throw new Error(`arXiv PDF download failed: response is not a PDF (${contentType})`)
+		}
+
+		const tempPath = `${pdfPath}.${Date.now()}.tmp`
+		try {
+			await fs.writeFile(tempPath, bytes)
+			await fs.rename(tempPath, pdfPath)
+		} catch (error) {
+			await fs.unlink(tempPath).catch(() => undefined)
+			throw error
+		}
+
+		return { status: "downloaded", path: pdfPath, url }
+	}
+
+	private async writeEntry(entry: ReferenceEntry, cwdOverride?: string): Promise<void> {
+		const mdContent = this.serializeEntry(entry)
+		await fs.writeFile(this.mdPath(entry.citeKey, cwdOverride), mdContent, "utf-8")
+	}
+}
+
+function normalizeArxivId(value?: string | null, options: { allowBareId?: boolean } = {}): string | undefined {
+	const trimmed = value?.trim()
+	if (!trimmed) return undefined
+	const explicit = trimmed.match(EXPLICIT_ARXIV_ID_PATTERN)
+	if (explicit?.[1]) return stripPdfSuffix(explicit[1])
+	if (!options.allowBareId) return undefined
+	const withoutPdf = stripPdfSuffix(trimmed)
+	return STRICT_ARXIV_ID_PATTERN.test(withoutPdf) ? withoutPdf : undefined
+}
+
+function stripPdfSuffix(value: string): string {
+	return value.trim().replace(/\.pdf$/i, "")
+}
+
+function normalizeIdentifier(value?: string): string {
+	return value?.trim().toLowerCase() ?? ""
+}
+
+function normalizeTitle(value?: string): string {
+	return (value ?? "")
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, " ")
+		.trim()
+}
+
+function uniqueStrings(values: string[]): string[] {
+	return [...new Set(values.map((value) => value.trim()).filter(Boolean))]
+}
+
+function isPdfBuffer(buffer: Buffer): boolean {
+	return buffer.subarray(0, PDF_MAGIC.length).toString("utf-8") === PDF_MAGIC
 }
