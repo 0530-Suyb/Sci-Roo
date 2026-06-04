@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState, useMemo } from "react"
 import { useEvent } from "react-use"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 
-import { type ExtensionMessage, TelemetryEventName } from "@roo-code/types"
+import { type ExtensionMessage, type RooCodeSettings, TelemetryEventName } from "@roo-code/types"
 
 import TranslationProvider from "./i18n/TranslationContext"
 import { MarketplaceViewStateManager } from "./components/marketplace/MarketplaceViewStateManager"
@@ -42,6 +42,15 @@ type Tab =
 	| "paperWriting"
 
 type ProjectChatBindingKey = "problemFramingTaskId" | "paperDraftTaskId"
+
+type AgentChatOpenOptions = {
+	mode: string
+	prompt: string
+	workspacePath?: string
+	autoRun?: boolean
+	nonInteractive?: boolean
+	autoApprovalConfiguration?: RooCodeSettings
+}
 
 interface PendingProjectChatBinding {
 	bindingKey: ProjectChatBindingKey
@@ -265,6 +274,33 @@ const App = () => {
 		[switchTab],
 	)
 
+	const openAgentChat = useCallback(
+		({ mode, prompt, workspacePath, autoRun, nonInteractive, autoApprovalConfiguration }: AgentChatOpenOptions) => {
+			setPendingProjectChatBinding(null)
+
+			if (autoRun) {
+				vscode.postMessage({
+					type: "newTask",
+					text: prompt,
+					taskWorkspacePath: workspacePath,
+					nonInteractive,
+					taskConfiguration: { mode },
+					taskAutoApprovalConfiguration: autoApprovalConfiguration,
+				} as any)
+				switchTab("chat")
+				return
+			}
+
+			vscode.postMessage({ type: "clearTask" } as any)
+			vscode.postMessage({ type: "mode", text: mode } as any)
+			switchTab("chat")
+			window.setTimeout(() => {
+				vscode.postMessage({ type: "insertTextIntoTextarea", text: prompt } as any)
+			}, 50)
+		},
+		[switchTab],
+	)
+
 	// Initialize source map support for better error reporting
 	useEffect(() => {
 		// Initialize source maps for better error reporting in production
@@ -340,7 +376,9 @@ const App = () => {
 				/>
 			)}
 			{tab === "literature" && <LiteratureView onDone={() => switchTab("researchPipeline")} />}
-			{tab === "readPaper" && <ReadPaperView onDone={() => switchTab("researchPipeline")} />}
+			{tab === "readPaper" && (
+				<ReadPaperView onDone={() => switchTab("researchPipeline")} onOpenAnalysisChat={openAgentChat} />
+			)}
 			{tab === "dataStudio" && <DataStudioView onDone={() => switchTab("researchPipeline")} />}
 			{tab === "researchPipeline" && <ResearchPipelineView onOpenBoundChat={openProjectBoundChat} />}
 			{tab === "paperWriting" && (

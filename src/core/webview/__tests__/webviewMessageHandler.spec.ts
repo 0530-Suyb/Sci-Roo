@@ -76,6 +76,7 @@ const mockClineProvider = {
 	postStateToWebview: vi.fn(),
 	getCurrentTask: vi.fn(),
 	getTaskWithId: vi.fn(),
+	createTask: vi.fn(),
 	createTaskWithHistoryItem: vi.fn(),
 	getSkillsManager: vi.fn(),
 	cwd: "/mock/workspace",
@@ -88,16 +89,21 @@ vi.mock("vscode", () => {
 	const showErrorMessage = vi.fn()
 	const openTextDocument = vi.fn().mockResolvedValue({})
 	const showTextDocument = vi.fn().mockResolvedValue(undefined)
+	const showOpenDialog = vi.fn()
 
 	return {
 		window: {
 			showInformationMessage,
 			showErrorMessage,
 			showTextDocument,
+			showOpenDialog,
 		},
 		workspace: {
 			workspaceFolders: [{ uri: { fsPath: "/mock/workspace" } }],
 			openTextDocument,
+		},
+		Uri: {
+			file: vi.fn((fsPath: string) => ({ fsPath })),
 		},
 	}
 })
@@ -162,6 +168,57 @@ vi.mock("../../mentions/resolveImageMentions", () => ({
 }))
 
 import { resolveImageMentions } from "../../mentions/resolveImageMentions"
+
+describe("webviewMessageHandler - ReadPaper PDF analysis picker", () => {
+	beforeEach(() => {
+		vi.clearAllMocks()
+	})
+
+	it("returns normalized initial PDF paths without opening the picker", async () => {
+		await webviewMessageHandler(mockClineProvider, {
+			type: "readPaperSelectAnalysisPdfs",
+			values: {
+				initialPaths: [
+					"D:\\papers\\a.pdf",
+					"D:\\papers\\a.pdf",
+					"D:\\papers\\notes.txt",
+					"  D:\\papers\\b.PDF  ",
+					"",
+				],
+			},
+		})
+
+		expect(vscode.window.showOpenDialog).not.toHaveBeenCalled()
+		expect(mockClineProvider.postMessageToWebview).toHaveBeenCalledWith({
+			type: "readPaperAnalysisPdfsSelected",
+			values: { pdfPaths: ["D:\\papers\\a.pdf", "D:\\papers\\b.PDF"] },
+		})
+	})
+
+	it("posts an empty selection when the PDF picker is canceled", async () => {
+		vi.mocked(vscode.window.showOpenDialog).mockResolvedValue(undefined)
+
+		await webviewMessageHandler(mockClineProvider, {
+			type: "readPaperSelectAnalysisPdfs",
+			values: { cwd: "D:\\workspace" },
+		})
+
+		expect(vscode.window.showOpenDialog).toHaveBeenCalledWith(
+			expect.objectContaining({
+				canSelectFiles: true,
+				canSelectFolders: false,
+				canSelectMany: true,
+				openLabel: "Analyze PDFs",
+				title: "Select PDFs to analyze",
+				filters: { "PDF files": ["pdf"] },
+			}),
+		)
+		expect(mockClineProvider.postMessageToWebview).toHaveBeenCalledWith({
+			type: "readPaperAnalysisPdfsSelected",
+			values: { pdfPaths: [] },
+		})
+	})
+})
 
 describe("webviewMessageHandler - requestLmStudioModels", () => {
 	beforeEach(() => {
@@ -233,6 +290,50 @@ describe("webviewMessageHandler - image mentions", () => {
 		expect(mockHandleWebviewAskResponse).toHaveBeenCalledWith("messageResponse", "See @/img.png", [
 			"data:image/png;base64,from-mention",
 		])
+	})
+})
+
+describe("webviewMessageHandler - newTask", () => {
+	beforeEach(() => {
+		vi.clearAllMocks()
+		mockClineProvider.getState = vi.fn().mockResolvedValue({
+			maxImageFileSize: 5,
+			maxTotalImageSize: 20,
+		})
+		vi.mocked(mockClineProvider.getCurrentTask).mockReturnValue(undefined)
+		vi.mocked(mockClineProvider.createTask).mockResolvedValue({} as any)
+	})
+
+	it("passes non-interactive and task-local auto-approval settings into createTask", async () => {
+		const autoApprovalConfiguration = {
+			autoApprovalEnabled: true,
+			alwaysAllowExecute: true,
+			allowedCommands: ["*"],
+		}
+
+		await webviewMessageHandler(mockClineProvider, {
+			type: "newTask",
+			text: "Analyze selected PDFs",
+			taskId: "readpaper-analysis-task",
+			taskWorkspacePath: "D:\\BaiduSyncdisk\\ZTC26-VibeResearch\\Github\\Sci-Roo",
+			nonInteractive: true,
+			taskConfiguration: { mode: "sci-lit-review" },
+			taskAutoApprovalConfiguration: autoApprovalConfiguration,
+		})
+
+		expect(mockClineProvider.createTask).toHaveBeenCalledWith(
+			"Analyze selected PDFs",
+			["data:image/png;base64,from-mention"],
+			undefined,
+			{
+				taskId: "readpaper-analysis-task",
+				workspacePath: "D:\\BaiduSyncdisk\\ZTC26-VibeResearch\\Github\\Sci-Roo",
+				nonInteractive: true,
+				autoApprovalOverrides: autoApprovalConfiguration,
+			},
+			{ mode: "sci-lit-review" },
+		)
+		expect(mockClineProvider.postMessageToWebview).toHaveBeenCalledWith({ type: "invoke", invoke: "newChat" })
 	})
 })
 

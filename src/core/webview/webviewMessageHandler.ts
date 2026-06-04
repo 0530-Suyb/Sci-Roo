@@ -58,6 +58,7 @@ import {
 	handleReadPaperImportCandidate,
 	handleReadPaperImportRetrieval,
 	handleReadPaperRunRetrieval,
+	handleReadPaperSelectAnalysisPdfs,
 	handleReadPaperUpdateCandidate,
 	handleReadPaperUpdateRetrieval,
 	handleReadPaperResetWorkspaceConfig,
@@ -673,7 +674,12 @@ export const webviewMessageHandler = async (
 					resolved.text,
 					resolved.images,
 					undefined,
-					{ taskId: message.taskId },
+					{
+						taskId: message.taskId,
+						workspacePath: message.taskWorkspacePath,
+						nonInteractive: message.nonInteractive,
+						autoApprovalOverrides: message.taskAutoApprovalConfiguration,
+					},
 					message.taskConfiguration,
 				)
 				// Task created successfully - notify the UI to reset
@@ -3180,6 +3186,10 @@ export const webviewMessageHandler = async (
 		}
 		case "readPaperImportRetrieval": {
 			await handleReadPaperImportRetrieval(provider, message)
+			break
+		}
+		case "readPaperSelectAnalysisPdfs": {
+			await handleReadPaperSelectAnalysisPdfs(provider, message)
 			break
 		}
 		case "dataStudioRun": {
