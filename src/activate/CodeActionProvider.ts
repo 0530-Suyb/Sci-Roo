@@ -1,9 +1,9 @@
 import * as vscode from "vscode"
 
-import { CodeActionName, CodeActionId } from "@roo-code/types"
+import { CodeActionName, CodeActionId, CommandId } from "@roo-code/types"
 import { Package } from "../shared/package"
 
-import { getCodeActionCommand } from "../utils/commands"
+import { getCodeActionCommand, getCommand } from "../utils/commands"
 import { EditorUtils } from "../integrations/editor/EditorUtils"
 
 export const TITLES: Record<CodeActionName, string> = {
@@ -13,6 +13,8 @@ export const TITLES: Record<CodeActionName, string> = {
 	ADD_TO_CONTEXT: "Add to Roo Code",
 	NEW_TASK: "New Roo Code Task",
 } as const
+
+const PAPER_WRITING_TITLE = "Writing..."
 
 export class CodeActionProvider implements vscode.CodeActionProvider {
 	public static readonly providedCodeActionKinds = [
@@ -28,6 +30,17 @@ export class CodeActionProvider implements vscode.CodeActionProvider {
 	): vscode.CodeAction {
 		const action = new vscode.CodeAction(title, kind)
 		action.command = { command: getCodeActionCommand(command), title, arguments: args }
+		return action
+	}
+
+	private createCommandAction(
+		title: string,
+		kind: vscode.CodeActionKind,
+		command: CommandId,
+		args: any[] = [],
+	): vscode.CodeAction {
+		const action = new vscode.CodeAction(title, kind)
+		action.command = { command: getCommand(command), title, arguments: args }
 		return action
 	}
 
@@ -58,6 +71,16 @@ export class CodeActionProvider implements vscode.CodeActionProvider {
 					effectiveRange.range.end.line + 1,
 				]),
 			)
+
+			if (this.isSupportedPaperDocument(document) && effectiveRange.text.trim().length > 0) {
+				actions.push(
+					this.createCommandAction(
+						PAPER_WRITING_TITLE,
+						vscode.CodeActionKind.RefactorRewrite,
+						"paperWritingQuickActions",
+					),
+				)
+			}
 
 			if (context.diagnostics.length > 0) {
 				const relevantDiagnostics = context.diagnostics.filter((d) =>
@@ -100,5 +123,13 @@ export class CodeActionProvider implements vscode.CodeActionProvider {
 			console.error("Error providing code actions:", error)
 			return []
 		}
+	}
+
+	private isSupportedPaperDocument(document: vscode.TextDocument): boolean {
+		if (["latex", "markdown"].includes(document.languageId)) {
+			return true
+		}
+		const lowerPath = document.uri.fsPath.toLowerCase()
+		return lowerPath.endsWith(".tex") || lowerPath.endsWith(".md")
 	}
 }

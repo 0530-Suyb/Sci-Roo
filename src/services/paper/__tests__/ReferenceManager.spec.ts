@@ -159,6 +159,44 @@ describe("ReferenceManager ReadPaper arXiv import", () => {
 		expect(files.filter((file) => file.endsWith(".md"))).toHaveLength(0)
 		expect(files.filter((file) => file.endsWith(".pdf"))).toHaveLength(0)
 	})
+
+	it("excludes citation-needed placeholders from missing cite keys and returns placeholder details", async () => {
+		await fs.mkdir(path.join(tempDir, "latex"), { recursive: true })
+		await fs.writeFile(
+			path.join(tempDir, "latex", "main.tex"),
+			[
+				"Intro text [CITATION NEEDED: baseline comparison].",
+				"Known citation \\\\cite{doe2024}.",
+				"Mistyped citation \\\\cite{[CITATION NEEDED]}.",
+			].join("\n"),
+			"utf-8",
+		)
+		await manager.addEntry({
+			citeKey: "doe2024",
+			title: "Test Paper",
+			authors: [{ firstName: "Jane", lastName: "Doe" }],
+			year: 2024,
+			venue: "arXiv",
+			doi: "",
+			arxivId: "",
+			abstract: "",
+			keywords: [],
+			bibtex: "",
+		})
+
+		const result = await manager.scanTexCitations()
+
+		expect(result.cited).toEqual(["doe2024"])
+		expect(result.missing).toEqual([])
+		expect(result.citationPlaceholders).toEqual([
+			expect.objectContaining({
+				detail: "baseline comparison",
+				line: 1,
+				text: "[CITATION NEEDED: baseline comparison]",
+			}),
+			expect.objectContaining({ detail: undefined, line: 3, text: "[CITATION NEEDED]" }),
+		])
+	})
 })
 
 function candidate(overrides: Partial<RetrievalCandidate> = {}): RetrievalCandidate {

@@ -561,13 +561,34 @@ export const webviewMessageHandler = async (
 	}
 
 	switch (message.type) {
-		case "webviewDidLaunch":
-			// Load custom modes first
-			const customModes = await provider.customModesManager.getCustomModes()
-			await updateGlobalState("customModes", customModes)
-
-			provider.postStateToWebview()
+		case "webviewDidLaunch": {
+			const webviewLaunchStart = Date.now()
+			provider.log("[StartupTrace] webviewDidLaunch:received")
+			// Hydrate the webview immediately with a lightweight state so the UI can render,
+			// then fill in heavier state asynchronously.
+			void provider.postInitialStateToWebview()
+			void provider.postStateToWebviewWithoutClineMessages()
 			provider.workspaceTracker?.initializeFilePaths() // Don't await.
+			provider.log(`[StartupTrace] webviewDidLaunch:kickedInitialRequests ${Date.now() - webviewLaunchStart}ms`)
+
+			void provider.customModesManager
+				.getCustomModes()
+				.then(async (customModes) => {
+					await updateGlobalState("customModes", customModes)
+					await provider.postStateToWebviewWithoutClineMessages()
+					provider.log(
+						`[StartupTrace] webviewDidLaunch:customModesApplied ${Date.now() - webviewLaunchStart}ms`,
+					)
+				})
+				.catch((error) =>
+					provider.log(
+						`Error loading custom modes during webview launch: ${JSON.stringify(
+							error,
+							Object.getOwnPropertyNames(error),
+							2,
+						)}`,
+					),
+				)
 
 			getTheme().then((theme) => provider.postMessageToWebview({ type: "theme", text: JSON.stringify(theme) }))
 
@@ -633,7 +654,7 @@ export const webviewMessageHandler = async (
 				)
 
 			// Enable telemetry by default (when unset) or when explicitly enabled
-			provider.getStateToPostToWebview().then((state) => {
+			provider.getState().then((state) => {
 				const { telemetrySetting } = state
 				const isOptedIn = telemetrySetting !== "disabled"
 				TelemetryService.instance.updateTelemetryState(isOptedIn)
@@ -641,6 +662,7 @@ export const webviewMessageHandler = async (
 
 			provider.isViewLaunched = true
 			break
+		}
 		case "newTask":
 			// Initializing new instance of Cline will make sure that any
 			// agentically running promises in old instance don't affect our new

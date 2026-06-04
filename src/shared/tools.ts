@@ -97,6 +97,7 @@ export const toolParamNames = [
 	"section_type",
 	"section_content",
 	"references",
+	"tags",
 	"authors",
 	"citation_style",
 	"citation_ids",

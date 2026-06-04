@@ -276,7 +276,7 @@ export interface SectionConfig {
 export interface VenueTemplate {
 	id: string
 	name: string
-	type: "ml" | "systems" | "general"
+	type: "ml" | "systems" | "general" | "ieee"
 	pageLimit: number
 	extraPages: number
 	citationStyle: string
@@ -284,6 +284,8 @@ export interface VenueTemplate {
 	hasChecklist: boolean
 	hasBroaderImpact: boolean
 	hasLimitations: boolean
+	templateDirName?: string
+	primaryTexFile?: string
 	skillNames?: string[] // skill names to copy to project's .roo/skills/
 }
 
@@ -303,6 +305,160 @@ export interface SnapshotMeta {
 	createdAt: string
 	label?: string
 	fileCount: number
+}
+
+export type VerificationStatus = "verified" | "unverified" | "flagged" | "missing"
+
+export type VerificationReason =
+	| "local-metadata-only"
+	| "doi-match"
+	| "doi-title-mismatch"
+	| "fuzzy-match"
+	| "fuzzy-low-confidence"
+	| "source-not-found"
+	| "missing-local-entry"
+	| "insufficient-metadata"
+	| "network-error"
+	| "manual-dismissed"
+
+export interface VerificationMatch {
+	source: "crossref" | "openalex"
+	doi: string | null
+	title: string
+	authors: string[]
+	year: number | null
+	similarityScore: number
+}
+
+export interface VerificationEntry {
+	citeKey: string
+	status: VerificationStatus
+	reason: VerificationReason
+	confidence: number
+	verifiedAt: string | null
+	method: "doi-direct" | "title-author-fuzzy" | "local-only" | "skipped"
+	sourceSnapshot: {
+		localTitle?: string
+		localAuthors?: string[]
+		localYear?: number
+		localDoi?: string
+	}
+	matches: VerificationMatch[]
+	stale: boolean
+	dismissedByUser?: boolean
+	dismissedReason?: string
+}
+
+export interface VerificationStore {
+	version: 1
+	lastFullScan: string | null
+	manuscriptPath: string | null
+	manuscriptHash: string | null
+	entries: Record<string, VerificationEntry>
+}
+
+export interface CitationPlaceholderEntry {
+	text: string
+	detail?: string
+	line: number
+	filePath?: string
+}
+
+export interface PaperWorkspaceStateShape {
+	manuscript: {
+		relativePath: string | null | undefined
+		absolutePath: string | null | undefined
+		pdfAbsolutePath: string | null
+		pdfRelativePath: string | null
+		exists: boolean
+		wordCount: number
+		lastEdited: string | null
+		missingCitationCount: number
+		citationPlaceholderCount: number
+		citationCount: number
+		hasBibliographyFile: boolean
+		hasPdf: boolean
+		status: "missing" | "empty" | "drafting" | "ready-for-review"
+		outline: Array<{
+			id: string
+			level: 1 | 2 | 3
+			title: string
+			line: number
+		}>
+		currentHeading: string | null
+	}
+	assets: {
+		paperPlanReady: boolean
+		researchQuestionsReady: boolean
+		revisionLog: {
+			exists: boolean
+			openItems: number
+			checklistOpen: number
+		}
+	}
+	editorContext: {
+		filePath: string | null
+		languageId: string | null
+		inProject: boolean
+		onPrimaryManuscript: boolean
+		hasSelection: boolean
+		selectionWordCount: number
+	}
+	git: {
+		available: boolean
+		branch: string | null
+		hasChanges: boolean
+		changedFiles: number
+		stagedFiles: number
+		unstagedFiles: number
+		untrackedFiles: number
+		ahead: number
+		behind: number
+	}
+	checks: Array<{
+		id: string
+		label: string
+		severity: "info" | "warning" | "ready"
+	}>
+	recommendedAction: string
+}
+
+export interface PaperProjectViewState {
+	project?: PaperProject | null
+	referenceEntries?: ReferenceEntry[]
+	uncatalogued?: Array<{ fileName?: string; path?: string } | string>
+	workspaceState?: PaperWorkspaceStateShape | null
+	message?: string
+	error?: string
+	newTemplateId?: string
+	venueSwitchPreview?: unknown
+	venueSwitched?: boolean
+}
+
+export interface PaperReferenceViewState {
+	entries?: ReferenceEntry[]
+	uncatalogued?: Array<{ fileName?: string; path?: string } | string>
+	cited?: string[] | null
+	missing?: string[] | null
+	citationPlaceholders?: CitationPlaceholderEntry[]
+	bibGenerated?: boolean
+	bibPreview?: string | null
+	addedEntry?: ReferenceEntry
+	removed?: string
+	batchImport?: {
+		imported?: string[] | number
+		skipped?: string[] | number
+		failed?: number
+		errors?: string[]
+	}
+	verificationState?: VerificationStore
+	sectionCiteMap?: Record<string, string[]>
+	citeLineMap?: Record<string, number[]>
+}
+
+export interface PaperSnapshotViewState {
+	snapshots?: SnapshotMeta[]
+	restored?: string
 }
 
 export const PAPER_PROJECT_DIR = ".roo"

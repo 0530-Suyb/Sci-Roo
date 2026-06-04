@@ -22,6 +22,7 @@ import type { McpServer } from "./mcp.js"
 import type { ModelRecord, RouterModels } from "./model.js"
 import type { OpenAiCodexRateLimitInfo } from "./providers/openai-codex-rate-limits.js"
 import type { SkillMetadata } from "./skills.js"
+import type { PaperProjectViewState, PaperReferenceViewState, PaperSnapshotViewState } from "./research.js"
 import type { WorktreeIncludeStatus } from "./worktree.js"
 
 /**
@@ -207,12 +208,9 @@ export interface ExtensionMessage {
 	researchPipelineState?: any // For research pipeline state response
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	paperWritingState?: any // For paper writing state response
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	paperProjectState?: any // For paper project state response
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	paperReferenceState?: any // For paper reference state response
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	paperSnapshotState?: any // For paper snapshot state response
+	paperProjectState?: PaperProjectViewState // For paper project state response
+	paperReferenceState?: PaperReferenceViewState // For paper reference state response
+	paperSnapshotState?: PaperSnapshotViewState // For paper snapshot state response
 	modes?: { slug: string; name: string }[] // For modes response
 	aggregatedCosts?: {
 		// For taskWithAggregatedCosts response

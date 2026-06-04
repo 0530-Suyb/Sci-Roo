@@ -238,14 +238,16 @@ const App = () => {
 			mode,
 			prompt,
 			existingTaskId,
+			forceNewTask,
 		}: {
 			bindingKey: ProjectChatBindingKey
 			projectRoot: string
 			mode: string
 			prompt: string
 			existingTaskId?: string
+			forceNewTask?: boolean
 		}) => {
-			if (existingTaskId) {
+			if (existingTaskId && !forceNewTask) {
 				setPendingProjectChatBinding(null)
 				switchTab("chat")
 				vscode.postMessage({ type: "showTaskWithId", text: existingTaskId } as any)
@@ -294,7 +296,22 @@ const App = () => {
 	}, [tab])
 
 	if (!didHydrateState) {
-		return null
+		return (
+			<div className="flex min-h-screen items-center justify-center bg-background px-6">
+				<div className="w-full max-w-xl rounded-3xl border border-vscode-panel-border bg-card/95 p-8 shadow-[0_18px_50px_rgba(0,0,0,0.12)]">
+					<p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Sci-Roo</p>
+					<h2 className="mt-3 text-2xl font-semibold">Loading workspace...</h2>
+					<p className="mt-2 text-sm text-muted-foreground">
+						Preparing the research pipeline, project context, and writing workspace.
+					</p>
+					<div className="mt-6 space-y-3">
+						<div className="h-16 animate-pulse rounded-2xl bg-muted/60" />
+						<div className="h-16 animate-pulse rounded-2xl bg-muted/60" />
+						<div className="h-16 animate-pulse rounded-2xl bg-muted/60" />
+					</div>
+				</div>
+			</div>
+		)
 	}
 
 	// Do not conditionally load ChatView, it's expensive and there's state we

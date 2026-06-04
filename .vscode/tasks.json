@@ -5,7 +5,7 @@
 	"tasks": [
 		{
 			"label": "watch",
-			"dependsOn": ["watch:webview", "watch:bundle", "watch:tsc"],
+			"dependsOn": ["watch:webview", "watch:bundle"],
 			"presentation": {
 				"reveal": "never"
 			},
@@ -44,10 +44,11 @@
 		{
 			"label": "watch:bundle",
 			"type": "shell",
-			"command": "npx turbo watch:bundle",
+			"command": "node src/esbuild.mjs --watch",
 			"options": {
+				"cwd": "${workspaceFolder}",
 				"env": {
-					"PATH": "${workspaceFolder}\\.tools\\node-v20.19.2-win-x64;${env:PATH}"
+					"PATH": "D:\\nodejs;${env:PATH}"
 				}
 			},
 			"group": "build",

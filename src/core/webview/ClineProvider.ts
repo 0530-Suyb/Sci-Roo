@@ -84,6 +84,7 @@ import { PaperProjectManager } from "../../services/paper/PaperProjectManager"
 import { PaperSectionManager } from "../../services/paper/PaperSectionManager"
 import { ReferenceManager } from "../../services/paper/ReferenceManager"
 import { VenueTemplateManager } from "../../services/paper/VenueTemplateManager"
+import { CitationVerifier } from "../../services/paper/CitationVerifier"
 
 import { fileExistsAtPath } from "../../utils/fs"
 import { setTtsEnabled, setTtsSpeed } from "../../utils/tts"
@@ -161,6 +162,7 @@ export class ClineProvider
 	protected venueTemplateManager?: VenueTemplateManager
 	private marketplaceManager: MarketplaceManager
 	private mdmService?: MdmService
+	private deferredServicesInitialization?: Promise<void>
 	private taskCreationCallback: (task: Task) => void
 	private taskEventListeners: WeakMap<Task, Array<() => void>> = new WeakMap()
 	private currentWorkspacePath: string | undefined
@@ -232,50 +234,49 @@ export class ClineProvider
 			await this.postStateToWebviewWithoutClineMessages()
 		})
 
-		// Initialize MCP Hub through the singleton manager
-		McpServerManager.getInstance(this.context, this)
-			.then((hub) => {
-				this.mcpHub = hub
-				this.mcpHub.registerClient()
-			})
-			.catch((error) => {
-				this.log(`Failed to initialize MCP Hub: ${error}`)
-			})
-
-		// Initialize Skills Manager for skill discovery
 		this.skillsManager = new SkillsManager(this)
-		this.skillsManager.initialize().catch((error) => {
-			this.log(`Failed to initialize Skills Manager: ${error}`)
-		})
-
-		// Initialize Literature Manager for research paper management
 		this.literatureManager = new LiteratureManager(this)
-		this.literatureManager.initialize().catch((error) => {
-			this.log(`Failed to initialize Literature Manager: ${error}`)
-		})
-
 		this.retrievalManager = new RetrievalManager(this)
-		this.retrievalManager.initialize().catch((error) => {
-			this.log(`Failed to initialize ReadPaper Retrieval Manager: ${error}`)
-		})
-
 		this.dataStudioManager = new DataStudioManager(this)
-		this.dataStudioManager.initialize().catch((error) => {
-			this.log(`Failed to initialize Data Studio Manager: ${error}`)
-		})
-
 		this.researchPipelineManager = new ResearchPipelineManager(this)
-		this.researchPipelineManager.initialize().catch((error) => {
-			this.log(`Failed to initialize Research Pipeline Manager: ${error}`)
-		})
-
 		this.venueTemplateManager = new VenueTemplateManager(this.context.extensionPath)
 		this.paperProjectManager = new PaperProjectManager(this, this.context.extensionPath)
 		this.referenceManager = new ReferenceManager(this)
 		this.paperSectionManager = new PaperSectionManager(this)
 
-		this.paperProjectManager.autoDetect().catch((error) => {
-			this.log(`Failed to auto-detect paper project: ${error}`)
+		this.on(RooCodeEventName.TaskCompleted, async (taskId: string) => {
+			try {
+				const project = this.paperProjectManager?.getCurrentProject()
+				if (!project || project.chatBindings?.paperDraftTaskId !== taskId) {
+					return
+				}
+				const referenceEntries = (await this.referenceManager?.listEntries()) ?? []
+				const texFilePath = this.paperProjectManager?.getPrimaryManuscriptAbsolutePath(project)
+				if (!texFilePath) {
+					return
+				}
+				const verifier = new CitationVerifier(project.rootPath)
+				const verificationState = await verifier.verifyAllCitations({
+					texFilePath,
+					referenceEntries,
+				})
+				const sectionCiteMap = await verifier.getSectionCiteMap(texFilePath).catch(() => ({}))
+				const { cited } = (await this.referenceManager?.scanTexCitations()) ?? { cited: [] }
+				const citeLineMap = Object.fromEntries(
+					await Promise.all(
+						cited.map(async (citeKey) => [
+							citeKey,
+							await verifier.getCiteLineLocations(texFilePath, citeKey).catch(() => []),
+						]),
+					),
+				)
+				await this.postMessageToWebview({
+					type: "paperReferenceState",
+					paperReferenceState: { verificationState, sectionCiteMap, citeLineMap },
+				})
+			} catch (error) {
+				this.log(`Failed to verify citations after paper draft task completion: ${error}`)
+			}
 		})
 
 		this.marketplaceManager = new MarketplaceManager(this.context, this.customModesManager)
@@ -365,15 +366,64 @@ export class ClineProvider
 				() => instance.off(RooCodeEventName.TaskTokenUsageUpdated, onTaskTokenUsageUpdated),
 			])
 		}
+	}
 
-		// Initialize Roo Code Cloud profile sync.
-		if (CloudService.hasInstance()) {
-			this.initializeCloudProfileSync().catch((error) => {
-				this.log(`Failed to initialize cloud profile sync: ${error}`)
-			})
-		} else {
-			this.log("CloudService not ready, deferring cloud profile sync")
+	private ensureDeferredServicesInitialized(): Promise<void> {
+		if (this.deferredServicesInitialization) {
+			return this.deferredServicesInitialization
 		}
+
+		this.deferredServicesInitialization = (async () => {
+			const deferredInitStart = Date.now()
+			this.log("[StartupTrace] deferred:init:start")
+			try {
+				const hub = await McpServerManager.getInstance(this.context, this)
+				this.mcpHub = hub
+				this.mcpHub.registerClient()
+				this.log(`[StartupTrace] deferred:init:mcpHub ${Date.now() - deferredInitStart}ms`)
+			} catch (error) {
+				this.log(`Failed to initialize MCP Hub: ${error}`)
+			}
+
+			this.skillsManager?.initialize().catch((error) => {
+				this.log(`Failed to initialize Skills Manager: ${error}`)
+			})
+			this.log(`[StartupTrace] deferred:init:skillsQueued ${Date.now() - deferredInitStart}ms`)
+
+			this.literatureManager?.initialize().catch((error) => {
+				this.log(`Failed to initialize Literature Manager: ${error}`)
+			})
+			this.log(`[StartupTrace] deferred:init:literatureQueued ${Date.now() - deferredInitStart}ms`)
+
+			this.retrievalManager?.initialize().catch((error) => {
+				this.log(`Failed to initialize ReadPaper Retrieval Manager: ${error}`)
+			})
+			this.log(`[StartupTrace] deferred:init:retrievalQueued ${Date.now() - deferredInitStart}ms`)
+
+			this.dataStudioManager?.initialize().catch((error) => {
+				this.log(`Failed to initialize Data Studio Manager: ${error}`)
+			})
+			this.log(`[StartupTrace] deferred:init:dataStudioQueued ${Date.now() - deferredInitStart}ms`)
+
+			this.researchPipelineManager?.initialize().catch((error) => {
+				this.log(`Failed to initialize Research Pipeline Manager: ${error}`)
+			})
+			this.log(`[StartupTrace] deferred:init:researchPipelineQueued ${Date.now() - deferredInitStart}ms`)
+
+			this.paperProjectManager?.autoDetect().catch((error) => {
+				this.log(`Failed to auto-detect paper project: ${error}`)
+			})
+			this.log(`[StartupTrace] deferred:init:paperAutoDetectQueued ${Date.now() - deferredInitStart}ms`)
+
+			if (this.view) {
+				await this.postStateToWebviewWithoutClineMessages().catch((error) => {
+					this.log(`Failed to post state after deferred initialization: ${error}`)
+				})
+			}
+			this.log(`[StartupTrace] deferred:init:complete ${Date.now() - deferredInitStart}ms`)
+		})()
+
+		return this.deferredServicesInitialization
 	}
 
 	/**
@@ -717,6 +767,8 @@ export class ClineProvider
 		}
 
 		this._disposed = true
+		this.isViewLaunched = false
+		this.deferredServicesInitialization = undefined
 		this.log("Disposing ClineProvider...")
 
 		// Clear all tasks from the stack.
@@ -889,7 +941,10 @@ export class ClineProvider
 	}
 
 	async resolveWebviewView(webviewView: vscode.WebviewView | vscode.WebviewPanel) {
+		const resolveStart = Date.now()
+		this.log("[StartupTrace] resolveWebviewView:start")
 		this.view = webviewView
+		this.isViewLaunched = true
 		const inTabMode = "onDidChangeViewState" in webviewView
 
 		if (inTabMode) {
@@ -943,10 +998,16 @@ export class ClineProvider
 			this.contextProxy.extensionMode === vscode.ExtensionMode.Development
 				? await this.getHMRHtmlContent(webviewView.webview)
 				: await this.getHtmlContent(webviewView.webview)
+		this.log(`[StartupTrace] resolveWebviewView:htmlReady ${Date.now() - resolveStart}ms`)
 
 		// Sets up an event listener to listen for messages passed from the webview view context
 		// and executes code based on the message that is received.
 		this.setWebviewMessageListener(webviewView.webview)
+		this.log(`[StartupTrace] resolveWebviewView:messageListenerReady ${Date.now() - resolveStart}ms`)
+
+		// Initialize heavier secondary services only after the webview is created,
+		// so extension activation and first paint stay responsive.
+		void this.ensureDeferredServicesInitialized()
 
 		// Initialize code index status subscription for the current workspace.
 		this.updateCodeIndexStatusSubscription()
@@ -1015,6 +1076,8 @@ export class ClineProvider
 		if (!currentTask || currentTask.abandoned || currentTask.abort) {
 			await this.removeClineFromStack()
 		}
+
+		this.log(`[StartupTrace] resolveWebviewView:complete ${Date.now() - resolveStart}ms`)
 	}
 
 	public async createTaskWithHistoryItem(
@@ -2037,6 +2100,46 @@ export class ClineProvider
 		}
 	}
 
+	async postInitialStateToWebview(): Promise<void> {
+		const initialStateStart = Date.now()
+		this.log("[StartupTrace] postInitialState:start")
+		const {
+			apiConfiguration,
+			mode,
+			language,
+			telemetrySetting,
+			cloudUserInfo,
+			cloudIsAuthenticated,
+			sharingEnabled,
+			publicSharingEnabled,
+			organizationAllowList,
+			organizationSettingsVersion,
+		} = await this.getState()
+
+		const currentTask = this.getCurrentTask()
+
+		this.postMessageToWebview({
+			type: "state",
+			state: {
+				version: this.context.extension?.packageJSON?.version ?? "",
+				apiConfiguration,
+				mode: mode ?? defaultModeSlug,
+				language: language ?? formatLanguage(vscode.env.language),
+				renderContext: this.renderContext,
+				cwd: this.cwd,
+				currentTaskId: currentTask?.taskId,
+				cloudUserInfo,
+				cloudIsAuthenticated: cloudIsAuthenticated ?? false,
+				sharingEnabled: sharingEnabled ?? false,
+				publicSharingEnabled: publicSharingEnabled ?? false,
+				organizationAllowList,
+				organizationSettingsVersion,
+				telemetrySetting,
+			},
+		})
+		this.log(`[StartupTrace] postInitialState:complete ${Date.now() - initialStateStart}ms`)
+	}
+
 	/**
 	 * Like postStateToWebview but intentionally omits taskHistory.
 	 *
@@ -2070,9 +2173,11 @@ export class ClineProvider
 	 *   (cloud auth, org settings, profiles, etc.) without interfering with task message streaming.
 	 */
 	async postStateToWebviewWithoutClineMessages(): Promise<void> {
+		const stateStart = Date.now()
 		const state = await this.getStateToPostToWebview()
 		const { clineMessages: _omitMessages, taskHistory: _omitHistory, ...rest } = state
 		this.postMessageToWebview({ type: "state", state: rest })
+		this.log(`[StartupTrace] postStateWithoutClineMessages:complete ${Date.now() - stateStart}ms`)
 
 		// Preserve existing MDM redirect behavior
 		if (this.mdmService?.requiresCloudAuth() && !this.checkMdmCompliance()) {

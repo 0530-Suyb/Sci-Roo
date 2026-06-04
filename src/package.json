@@ -3,7 +3,7 @@
 	"displayName": "%extension.displayName%",
 	"description": "%extension.description%",
 	"publisher": "suyb",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"icon": "assets/icons/icon.png",
 	"galleryBanner": {
 		"color": "#617A91",
@@ -109,6 +109,11 @@
 				"command": "sci-roo.paperWritingButtonClicked",
 				"title": "%command.paperWriting.title%",
 				"icon": "$(file-text)"
+			},
+			{
+				"command": "sci-roo.paperWritingQuickActions",
+				"title": "%command.paperWritingQuickActions.title%",
+				"category": "Paper Writing"
 			},
 			{
 				"command": "sci-roo.paperRewriteSelection",

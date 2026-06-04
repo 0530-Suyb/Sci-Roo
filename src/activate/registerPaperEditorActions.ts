@@ -6,6 +6,7 @@ import { singleCompletionHandler } from "../utils/single-completion-handler"
 import { ClineProvider } from "../core/webview/ClineProvider"
 
 type PaperEditorActionId =
+	| "paperWritingQuickActions"
 	| "paperRewriteSelection"
 	| "paperRephraseSelection"
 	| "paperReplaceWithAcademicSynonyms"
@@ -367,6 +368,12 @@ export const registerPaperEditorActions = ({ context, provider }: RegisterPaperE
 	const suggestionController = new PaperInlineSuggestionController()
 	context.subscriptions.push(suggestionController)
 
+	context.subscriptions.push(
+		vscode.commands.registerCommand(getCommand("paperWritingQuickActions" as CommandId), async () => {
+			await showPaperWritingQuickActions(provider, suggestionController)
+		}),
+	)
+
 	for (const action of PAPER_EDITOR_ACTIONS) {
 		context.subscriptions.push(
 			vscode.commands.registerCommand(getCommand(action.id as CommandId), async () => {
@@ -374,6 +381,93 @@ export const registerPaperEditorActions = ({ context, provider }: RegisterPaperE
 			}),
 		)
 	}
+}
+
+async function showPaperWritingQuickActions(
+	provider: ClineProvider,
+	suggestionController: PaperInlineSuggestionController,
+) {
+	const editor = vscode.window.activeTextEditor
+	if (!editor) {
+		vscode.window.showWarningMessage("No active editor found.")
+		return
+	}
+
+	if (editor.selection.isEmpty) {
+		vscode.window.showWarningMessage("Select a passage in the editor before using Sci-Roo writing actions.")
+		return
+	}
+
+	if (!isSupportedPaperEditor(editor.document)) {
+		vscode.window.showWarningMessage(
+			"Sci-Roo paper writing actions are intended for LaTeX or Markdown manuscript files.",
+		)
+		return
+	}
+
+	const groups: Array<{ label: string; items: PaperEditorActionConfig[] }> = [
+		{
+			label: "Polish",
+			items: [
+				getPaperAction("paperRewriteSelection"),
+				getPaperAction("paperRephraseSelection"),
+				getPaperAction("paperReplaceWithAcademicSynonyms"),
+				getPaperAction("paperMakeConciseSelection"),
+				getPaperAction("paperMakeAcademicSelection"),
+				getPaperAction("paperMakePreciseSelection"),
+				getPaperAction("paperAbbreviateSelection"),
+				getPaperAction("paperSplitSentencesSelection"),
+				getPaperAction("paperMergeSentencesSelection"),
+			],
+		},
+		{
+			label: "Generate",
+			items: [
+				getPaperAction("paperSummarizeSelection"),
+				getPaperAction("paperExplainSelection"),
+				getPaperAction("paperGenerateTitleFromSelection"),
+				getPaperAction("paperGenerateAbstractFromSelection"),
+				getPaperAction("paperGenerateKeywordsFromSelection"),
+				getPaperAction("paperExpandAcademicParagraph"),
+			],
+		},
+		{
+			label: "Citations",
+			items: [getPaperAction("paperAddCitationPlaceholder")],
+		},
+		{
+			label: "Translate",
+			items: [getPaperAction("paperTranslateSelectionChinese"), getPaperAction("paperTranslateSelectionEnglish")],
+		},
+	]
+
+	const quickPickItems = groups.flatMap((group) => [
+		{ label: group.label, kind: vscode.QuickPickItemKind.Separator as const },
+		...group.items.map((item) => ({
+			label: item.label,
+			description: group.label,
+			action: item,
+		})),
+	])
+
+	const picked = await vscode.window.showQuickPick(quickPickItems, {
+		placeHolder: "Choose a Sci-Roo writing action for the selected passage",
+		matchOnDescription: true,
+	})
+
+	if (!picked || !("action" in picked) || !picked.action) {
+		return
+	}
+
+	await runPaperEditorAction(provider, suggestionController, picked.action)
+}
+
+function getPaperAction(id: Exclude<PaperEditorActionId, "paperWritingQuickActions">): PaperEditorActionConfig {
+	const action = PAPER_EDITOR_ACTIONS.find((entry) => entry.id === id)
+	if (!action) {
+		throw new Error(`Unknown paper editor action: ${id}`)
+	}
+	return action
 }
 
 async function runPaperEditorAction(

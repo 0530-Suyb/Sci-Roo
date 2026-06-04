@@ -9,6 +9,7 @@ import {
 	Loader2,
 	ScrollText,
 } from "lucide-react"
+import type { VerificationStore } from "@roo-code/types"
 
 import { useExtensionState } from "@/context/ExtensionStateContext"
 import { Button } from "@/components/ui"
@@ -24,6 +25,7 @@ type PaperWritingViewProps = {
 		mode: string
 		prompt: string
 		existingTaskId?: string
+		forceNewTask?: boolean
 	}) => void
 }
 
@@ -108,6 +110,69 @@ const SELECTION_ACTION_GROUPS = [
 
 const DEFAULT_MANUSCRIPT_HINT = `% Start drafting here.\n`
 
+function buildAvailableReferencesForPrompt(options: {
+	referenceEntries: any[]
+	cited: string[] | null
+	currentSection: string | null | undefined
+	sectionCiteMap?: Record<string, string[]>
+	verificationState?: Pick<VerificationStore, "entries">
+}): Array<{
+	citeKey: string
+	title: string
+	authors: string
+	year: number
+	doi?: string
+	verificationHint: "verified" | "unverified" | "missing-doi"
+}> {
+	const citedSet = new Set(options.cited ?? [])
+	const currentSection = options.currentSection ?? null
+	const prioritized = [...options.referenceEntries].sort((left: any, right: any) => {
+		const leftInCurrentSection = currentSection
+			? options.sectionCiteMap?.[left.citeKey]?.includes(currentSection)
+				? 1
+				: 0
+			: 0
+		const rightInCurrentSection = currentSection
+			? options.sectionCiteMap?.[right.citeKey]?.includes(currentSection)
+				? 1
+				: 0
+			: 0
+		const leftIsCited = citedSet.has(left.citeKey) ? 1 : 0
+		const rightIsCited = citedSet.has(right.citeKey) ? 1 : 0
+		const leftDate = Date.parse(left.dateAdded ?? "") || 0
+		const rightDate = Date.parse(right.dateAdded ?? "") || 0
+
+		return (
+			rightIsCited - leftIsCited ||
+			rightInCurrentSection - leftInCurrentSection ||
+			rightDate - leftDate ||
+			String(left.citeKey).localeCompare(String(right.citeKey))
+		)
+	})
+
+	return prioritized.slice(0, 30).map((entry: any) => {
+		const verificationEntry = options.verificationState?.entries?.[entry.citeKey]
+		return {
+			citeKey: entry.citeKey,
+			title: entry.title,
+			authors: Array.isArray(entry.authors)
+				? entry.authors
+						.map((author: any) => author.lastName || author.firstName)
+						.filter(Boolean)
+						.join(", ")
+				: "",
+			year: entry.year,
+			doi: entry.doi || undefined,
+			verificationHint:
+				verificationEntry?.status === "verified" && !verificationEntry.stale
+					? "verified"
+					: entry.doi
+						? "unverified"
+						: "missing-doi",
+		}
+	})
+}
+
 function buildFirstDraftPrompt(input: {
 	projectName: string
 	projectDescription: string
@@ -117,6 +182,14 @@ function buildFirstDraftPrompt(input: {
 	primaryManuscriptPath: string
 	researchQuestionsReady: boolean
 	paperPlanReady: boolean
+	availableReferences: Array<{
+		citeKey: string
+		title: string
+		authors: string
+		year: number
+		doi?: string
+		verificationHint: "verified" | "unverified" | "missing-doi"
+	}>
 }): string {
 	const researchQuestionsState = input.researchQuestionsReady
 		? "problem/research-questions.md already contains meaningful content and should be treated as the primary source of the research problem."
@@ -136,11 +209,13 @@ function buildFirstDraftPrompt(input: {
 		researchQuestionsState,
 		paperPlanState,
 		"You are the Sci-Roo paper-writing agent. Your job is to create the first defensible manuscript draft for this project.",
-		"Before drafting, inspect and reconcile these sources in order: problem/research-questions.md, task/paper-plan.md, the target manuscript file, the template/ folder, and any rules in .roo/rules-sci-paper-writing/.",
+		"Before drafting, inspect and reconcile these sources in order: problem/research-questions.md, task/paper-plan.md, the target manuscript file, the template/ folder, any rules in .roo/rules-sci-paper-writing/, and reference/*.md files to understand what literature is already catalogued.",
 		"If the manuscript file is empty or only contains template placeholders, replace the placeholder content with a real first draft while preserving valid LaTeX structure.",
 		"Use the research questions file to anchor the paper's problem statement, use the paper plan to shape section flow, and use the template files strictly as formatting and structural constraints.",
 		"If the problem framing or paper plan is weak, state the gap briefly, make the most conservative reasonable assumption, and still move drafting forward instead of stalling.",
 		"Do not fabricate citations, data, experiments, or results. Keep any unknown evidence explicitly marked as a placeholder or note for follow-up.",
+		"Do not invent cite keys. Do not invent DOI values. If a needed source is not already in the library, insert [CITATION NEEDED: brief topic description] or [CITATION NEEDED: brief topic description | doi:10.xxxx/xxxx].",
+		buildAvailableReferencesBlock(input.availableReferences),
 		"Prefer drafting the manuscript directly in the target file rather than only describing what should be written.",
 		"Start by summarizing the writing strategy in 3-5 bullets, then produce the first draft in the manuscript.",
 	].join("\n")
@@ -156,6 +231,14 @@ function buildRevisionDraftPrompt(input: {
 	manuscriptWordCount: number
 	researchQuestionsReady: boolean
 	paperPlanReady: boolean
+	availableReferences: Array<{
+		citeKey: string
+		title: string
+		authors: string
+		year: number
+		doi?: string
+		verificationHint: "verified" | "unverified" | "missing-doi"
+	}>
 }): string {
 	const researchQuestionsState = input.researchQuestionsReady
 		? "problem/research-questions.md already contains meaningful content and should be used to judge whether the current draft is asking and answering the right research questions."
@@ -177,13 +260,40 @@ function buildRevisionDraftPrompt(input: {
 		`- ${paperPlanState}`,
 		"",
 		"Please revise the existing manuscript instead of restarting from scratch.",
-		"Before revising, inspect and reconcile these sources in order: the current manuscript file, problem/research-questions.md, task/paper-plan.md, the template/ folder, and any rules in .roo/rules-sci-paper-writing/.",
+		"Before revising, inspect and reconcile these sources in order: the current manuscript file, problem/research-questions.md, task/paper-plan.md, the template/ folder, any rules in .roo/rules-sci-paper-writing/, and reference/*.md files to understand what literature is already catalogued.",
 		"Treat the current manuscript as the primary working draft: preserve useful content, improve weak passages, reorganize unstable sections, and extend incomplete parts where needed.",
 		"Use the research questions file to verify problem clarity and scope, use the paper plan to tighten overall structure, and use the template files strictly as formatting and structural constraints.",
 		"Do not fabricate citations, data, experiments, or results. Keep any uncertain claims explicit and use honest placeholders where evidence is still missing.",
+		"Do not invent cite keys. Do not invent DOI values. If a needed source is not already in the library, insert [CITATION NEEDED: brief topic description] or [CITATION NEEDED: brief topic description | doi:10.xxxx/xxxx].",
+		buildAvailableReferencesBlock(input.availableReferences),
 		"",
 		"Additional revision request:",
 		"- Add your new instruction here before sending.",
+	].join("\n")
+}
+
+function buildAvailableReferencesBlock(
+	availableReferences: Array<{
+		citeKey: string
+		title: string
+		authors: string
+		year: number
+		doi?: string
+		verificationHint: "verified" | "unverified" | "missing-doi"
+	}>,
+): string {
+	if (availableReferences.length === 0) {
+		return "## Available Reference Library\nThe project library is currently empty."
+	}
+
+	const rows = availableReferences.map(
+		(reference) =>
+			`- ${reference.citeKey} | ${reference.year} | ${reference.authors} | ${reference.verificationHint} | ${reference.title}${reference.doi ? ` | doi:${reference.doi}` : ""}`,
+	)
+	return [
+		"## Available Reference Library",
+		"These references already exist in the project library. Use their exact cite keys when citing. Do not invent a new cite key for a paper that is already listed here.",
+		...rows,
 	].join("\n")
 }
 
@@ -204,12 +314,19 @@ const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone, onOpenResea
 	const assets = workspaceState?.assets ?? null
 	const checks = useMemo(() => workspaceState?.checks ?? [], [workspaceState?.checks])
 	const outline: OutlineItem[] = manuscript?.outline ?? []
-	const referenceEntries = paperReferenceState?.entries ?? paperProjectState?.referenceEntries ?? []
+	const referenceEntries = useMemo(
+		() => paperReferenceState?.entries ?? paperProjectState?.referenceEntries ?? [],
+		[paperProjectState?.referenceEntries, paperReferenceState?.entries],
+	)
 	const uncatalogued = paperReferenceState?.uncatalogued ?? paperProjectState?.uncatalogued ?? []
 	const cited = paperReferenceState?.cited ?? null
 	const missing = paperReferenceState?.missing ?? null
 	const bibGenerated = paperReferenceState?.bibGenerated ?? false
 	const bibPreview = paperReferenceState?.bibPreview ?? null
+	const verificationState = paperReferenceState?.verificationState
+	const sectionCiteMap = paperReferenceState?.sectionCiteMap
+	const citeLineMap = paperReferenceState?.citeLineMap
+	const citationPlaceholders = paperReferenceState?.citationPlaceholders ?? []
 	const snapshots = paperSnapshotState?.snapshots ?? []
 	const recommendedAction =
 		workspaceState?.recommendedAction ?? "Open the main manuscript and continue drafting in the editor."
@@ -244,7 +361,9 @@ const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone, onOpenResea
 			if (!project || !relativePath) {
 				return
 			}
-			const normalizedPath = `${String(project.rootPath).replace(/[\\/]$/, "")}/${relativePath}`.replace(
+			const rootPath = String(project.rootPath).replace(/[\\/]$/, "")
+			const rawPath = String(relativePath)
+			const normalizedPath = (/^[a-zA-Z]:[\\/]/.test(rawPath) ? rawPath : `${rootPath}/${rawPath}`).replace(
 				/\//g,
 				"\\",
 			)
@@ -329,6 +448,13 @@ const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone, onOpenResea
 			primaryManuscriptPath,
 			researchQuestionsReady: !!assets?.researchQuestionsReady,
 			paperPlanReady: !!assets?.paperPlanReady,
+			availableReferences: buildAvailableReferencesForPrompt({
+				referenceEntries,
+				cited,
+				currentSection: manuscript?.currentHeading,
+				sectionCiteMap,
+				verificationState,
+			}),
 		}
 		const prompt = manuscript?.exists
 			? buildRevisionDraftPrompt({
@@ -347,11 +473,99 @@ const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone, onOpenResea
 	}, [
 		assets?.paperPlanReady,
 		assets?.researchQuestionsReady,
+		cited,
 		manuscript,
 		onOpenBoundChat,
 		primaryManuscriptPath,
 		project,
+		referenceEntries,
+		sectionCiteMap,
+		verificationState,
 	])
+
+	const handleFixFlaggedCitations = useCallback(
+		(
+			entries: Array<{
+				citeKey: string
+				status: string
+				reason: string
+				confidence: number
+				matches?: Array<{ title: string }>
+			}>,
+		) => {
+			if (!project || !onOpenBoundChat || entries.length === 0) {
+				return
+			}
+
+			const prompt = [
+				"The following citations in the draft need attention.",
+				"",
+				...entries.map((entry) =>
+					[
+						`- citeKey: ${entry.citeKey}`,
+						`  status: ${entry.status}`,
+						`  reason: ${entry.reason}`,
+						`  confidence: ${entry.confidence}`,
+						citeLineMap?.[entry.citeKey]?.length
+							? `  lines: ${citeLineMap[entry.citeKey].join(", ")}`
+							: undefined,
+						entry.matches?.[0]?.title ? `  matchedTitle: "${entry.matches[0].title}"` : undefined,
+						"  action: revise the citation, replace it with a real source from the project library, or remove the unsupported claim.",
+					]
+						.filter(Boolean)
+						.join("\n"),
+				),
+				"",
+				"Do not modify passages that are not related to the listed citation issues.",
+				"Do not fabricate new bibliographic metadata or cite keys.",
+			].join("\n")
+
+			onOpenBoundChat({
+				bindingKey: "paperDraftTaskId",
+				projectRoot: project.rootPath,
+				mode: "sci-paper-writing",
+				prompt,
+				forceNewTask: true,
+			})
+		},
+		[citeLineMap, onOpenBoundChat, project],
+	)
+
+	const handleFixCitationPlaceholders = useCallback(
+		(placeholders: Array<{ text: string; detail?: string; line: number; filePath?: string }>) => {
+			if (!project || !onOpenBoundChat || placeholders.length === 0) {
+				return
+			}
+
+			const prompt = [
+				"The following citation placeholders in the draft need to be resolved.",
+				"",
+				...placeholders.map((placeholder) =>
+					[
+						`- placeholder: ${placeholder.text}`,
+						placeholder.detail ? `  detail: ${placeholder.detail}` : undefined,
+						`  line: ${placeholder.line}`,
+						placeholder.filePath ? `  file: ${placeholder.filePath}` : undefined,
+						"  action: replace this placeholder with a real citation from the project library if a supported source already exists, or revise the claim so it stays honest without fabricating a citation.",
+					]
+						.filter(Boolean)
+						.join("\n"),
+				),
+				"",
+				"Do not fabricate bibliographic metadata, cite keys, or unsupported claims.",
+				"Only modify the passages associated with the listed placeholders.",
+			].join("\n")
+
+			onOpenBoundChat({
+				bindingKey: "paperDraftTaskId",
+				projectRoot: project.rootPath,
+				mode: "sci-paper-writing",
+				prompt,
+				forceNewTask: true,
+			})
+		},
+		[onOpenBoundChat, project],
+	)
 
 	const openSupportTab = useCallback((tab: SideTab, options?: { pin?: boolean }) => {
 		if (options?.pin ?? true) {
@@ -1113,11 +1327,48 @@ const PaperWritingView: React.FC<PaperWritingViewProps> = ({ onDone, onOpenResea
 									cited={cited}
 									missing={missing}
 									citationPlaceholderCount={manuscript?.citationPlaceholderCount ?? 0}
+									citationPlaceholders={citationPlaceholders}
 									bibGenerated={bibGenerated}
 									bibPreview={bibPreview}
+									verificationState={verificationState}
+									sectionCiteMap={sectionCiteMap}
+									citeLineMap={citeLineMap}
+									currentSection={manuscript?.currentHeading ?? null}
 									selectedSection={null}
 									sectionContent=""
 									sectionInsight={null}
+									onFixFlaggedCitations={handleFixFlaggedCitations}
+									onFixCitationPlaceholders={handleFixCitationPlaceholders}
+									onJumpToCitation={(citeKey, line) =>
+										openProjectFile(primaryManuscriptPath, {
+											line: line ?? citeLineMap?.[citeKey]?.[0],
+										})
+									}
+									onJumpToPlaceholder={(placeholder) =>
+										openProjectFile(placeholder.filePath ?? primaryManuscriptPath, {
+											line: placeholder.line,
+										})
+									}
+									onVerifyAllCitations={() =>
+										vscode.postMessage({
+											type: "paperWritingAction",
+											action: "citationVerify",
+										})
+									}
+									onVerifyCitation={(citeKey) =>
+										vscode.postMessage({
+											type: "paperWritingAction",
+											action: "citationVerify",
+											query: citeKey,
+										})
+									}
+									onDismissCitationIssue={(citeKey) =>
+										vscode.postMessage({
+											type: "paperWritingAction",
+											action: "dismissCitationIssue",
+											query: citeKey,
+										})
+									}
 									embedded
 								/>
 							)}

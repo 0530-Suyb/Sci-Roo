@@ -372,11 +372,18 @@ export class PaperProjectManager {
 
 		const manuscriptPath = path.join(latexDir, "main.tex")
 		const referencesPath = path.join(latexDir, "references.bib")
+		const venue = getVenueTemplate(templateId)
+		const templatePrimaryTexPath = path.join(rootPath, "template", venue?.primaryTexFile ?? "main.tex")
 		const templateMainPath = path.join(rootPath, "template", "main.tex")
+		const texSourcePath = (await this.exists(templatePrimaryTexPath))
+			? templatePrimaryTexPath
+			: (await this.exists(templateMainPath))
+				? templateMainPath
+				: undefined
 
 		if (!(await this.exists(manuscriptPath))) {
-			if (await this.exists(templateMainPath)) {
-				await fs.copyFile(templateMainPath, manuscriptPath)
+			if (texSourcePath) {
+				await fs.copyFile(texSourcePath, manuscriptPath)
 			} else {
 				await fs.writeFile(manuscriptPath, this.getFallbackMainTex(templateId), "utf-8")
 			}

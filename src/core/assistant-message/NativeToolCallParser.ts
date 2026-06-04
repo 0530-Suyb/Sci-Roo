@@ -921,6 +921,37 @@ export class NativeToolCallParser {
 					}
 					break
 
+				case "literature_library":
+					if (args.action !== undefined) {
+						const normalizedQuery =
+							typeof args.query === "string" && args.query.trim().length > 0 ? args.query : undefined
+						const normalizedTags = Array.isArray(args.tags) && args.tags.length > 0 ? args.tags : undefined
+
+						nativeArgs = {
+							action: args.action,
+							entryId: args.entryId,
+							query: normalizedQuery,
+							tags: normalizedTags,
+							format: args.format,
+							entry:
+								args.entry && typeof args.entry === "object"
+									? {
+											title: args.entry.title,
+											authors: Array.isArray(args.entry.authors) ? args.entry.authors : [],
+											year: this.coerceOptionalNumber(args.entry.year),
+											journal: args.entry.journal,
+											doi: args.entry.doi,
+											abstract: args.entry.abstract,
+											keywords: Array.isArray(args.entry.keywords)
+												? args.entry.keywords
+												: undefined,
+											tags: Array.isArray(args.entry.tags) ? args.entry.tags : undefined,
+										}
+									: undefined,
+						} as NativeArgsFor<TName>
+					}
+					break
+
 				case "generate_image":
 					if (args.prompt !== undefined && args.path !== undefined) {
 						nativeArgs = {

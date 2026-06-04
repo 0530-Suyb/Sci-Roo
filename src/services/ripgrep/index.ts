@@ -92,8 +92,34 @@ export async function getBinPath(vscodeAppRoot: string): Promise<string | undefi
 		(await checkPath("node_modules/@vscode/ripgrep/bin/")) ||
 		(await checkPath("node_modules/vscode-ripgrep/bin")) ||
 		(await checkPath("node_modules.asar.unpacked/vscode-ripgrep/bin/")) ||
-		(await checkPath("node_modules.asar.unpacked/@vscode/ripgrep/bin/"))
+		(await checkPath("node_modules.asar.unpacked/@vscode/ripgrep/bin/")) ||
+		getBinPathFromSystem()
 	)
+}
+
+function getBinPathFromSystem(): string | undefined {
+	const command = isWindows ? "where" : "which"
+	const args = isWindows ? [binName] : ["rg"]
+
+	try {
+		const result = childProcess.spawnSync(command, args, {
+			encoding: "utf8",
+			windowsHide: true,
+		})
+
+		if (result.status !== 0 || !result.stdout) {
+			return undefined
+		}
+
+		const resolvedPath = result.stdout
+			.split(/\r?\n/)
+			.map((line) => line.trim())
+			.find(Boolean)
+
+		return resolvedPath || undefined
+	} catch {
+		return undefined
+	}
 }
 
 async function execRipgrep(bin: string, args: string[]): Promise<string> {

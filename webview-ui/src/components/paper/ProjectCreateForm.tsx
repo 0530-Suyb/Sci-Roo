@@ -25,7 +25,7 @@ type DirTemplateInfo = {
 type VenueTemplateInfo = {
 	id: string
 	name: string
-	type: "ml" | "systems" | "general"
+	type: "ml" | "systems" | "general" | "ieee"
 	pageLimit: number
 	extraPages: number
 	hasChecklist: boolean
@@ -186,6 +186,86 @@ const VENUE_TEMPLATES: VenueTemplateInfo[] = [
 		hasLimitations: false,
 	},
 	{
+		id: "ieee-icc",
+		name: "IEEE ICC",
+		type: "ieee",
+		pageLimit: 0,
+		extraPages: 0,
+		hasChecklist: false,
+		hasBroaderImpact: false,
+		hasLimitations: false,
+	},
+	{
+		id: "ieee-globecom",
+		name: "IEEE GLOBECOM",
+		type: "ieee",
+		pageLimit: 0,
+		extraPages: 0,
+		hasChecklist: false,
+		hasBroaderImpact: false,
+		hasLimitations: false,
+	},
+	{
+		id: "ieee-wcnc",
+		name: "IEEE WCNC",
+		type: "ieee",
+		pageLimit: 0,
+		extraPages: 0,
+		hasChecklist: false,
+		hasBroaderImpact: false,
+		hasLimitations: false,
+	},
+	{
+		id: "ieee-pimrc",
+		name: "IEEE PIMRC",
+		type: "ieee",
+		pageLimit: 0,
+		extraPages: 0,
+		hasChecklist: false,
+		hasBroaderImpact: false,
+		hasLimitations: false,
+	},
+	{
+		id: "ieee-iotj",
+		name: "IEEE Internet of Things Journal (IoTJ)",
+		type: "ieee",
+		pageLimit: 0,
+		extraPages: 0,
+		hasChecklist: false,
+		hasBroaderImpact: false,
+		hasLimitations: false,
+	},
+	{
+		id: "ieee-tcom",
+		name: "IEEE Transactions on Communications (TCOM)",
+		type: "ieee",
+		pageLimit: 0,
+		extraPages: 0,
+		hasChecklist: false,
+		hasBroaderImpact: false,
+		hasLimitations: false,
+	},
+	{
+		id: "ieee-twc",
+		name: "IEEE Transactions on Wireless Communications (TWC)",
+		type: "ieee",
+		pageLimit: 0,
+		extraPages: 0,
+		hasChecklist: false,
+		hasBroaderImpact: false,
+		hasLimitations: false,
+	},
+	{
+		id: "ieee-jsac",
+		name: "IEEE JSAC",
+		type: "ieee",
+		pageLimit: 13,
+		extraPages: 0,
+		hasChecklist: false,
+		hasBroaderImpact: false,
+		hasLimitations: false,
+	},
+	{
 		id: "generic",
 		name: "Generic LaTeX",
 		type: "general",
@@ -248,7 +328,15 @@ export const ProjectCreateForm: React.FC<ProjectCreateFormProps> = ({
 
 	const availableVenues = useMemo(() => {
 		const venueType = getVenueTypeForDir(selectedDir.id)
-		if (!venueType) return VENUE_TEMPLATES
+		if (!venueType) {
+			return [...VENUE_TEMPLATES.filter((venue) => venue.type === "general" || venue.type === "ieee")].sort(
+				(a, b) => {
+					if (a.id === "generic") return -1
+					if (b.id === "generic") return 1
+					return a.name.localeCompare(b.name)
+				},
+			)
+		}
 		return VENUE_TEMPLATES.filter((venue) => venue.type === venueType)
 	}, [selectedDir.id])
 

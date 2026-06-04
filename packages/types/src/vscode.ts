@@ -40,6 +40,7 @@ export const commandIds = [
 	"dataStudioButtonClicked",
 	"researchPipelineButtonClicked",
 	"paperWritingButtonClicked",
+	"paperWritingQuickActions",
 	"paperRewriteSelection",
 	"paperRephraseSelection",
 	"paperReplaceWithAcademicSynonyms",

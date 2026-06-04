@@ -18,6 +18,9 @@ import {
 	type McpServer,
 	type ReadPaperRetrievalState,
 	type ReadPaperWorkspaceConfig,
+	type PaperProjectViewState,
+	type PaperReferenceViewState,
+	type PaperSnapshotViewState,
 	RouterModels,
 	ORGANIZATION_ALLOW_ALL,
 	DEFAULT_CHECKPOINT_TIMEOUT_SECONDS,
@@ -152,9 +155,9 @@ export interface ExtensionStateContextType extends ExtensionState {
 	dataStudioState?: any
 	researchPipelineState?: any
 	paperWritingState?: any
-	paperProjectState?: any
-	paperReferenceState?: any
-	paperSnapshotState?: any
+	paperProjectState?: PaperProjectViewState
+	paperReferenceState?: PaperReferenceViewState
+	paperSnapshotState?: PaperSnapshotViewState
 }
 
 const extensionStateContextGlobal = globalThis as typeof globalThis & {
@@ -209,6 +212,7 @@ export const mergeExtensionState = (prevState: ExtensionState, newState: Partial
 }
 
 export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+	const webviewLaunchStartedAtRef = React.useRef<number>(Date.now())
 	const [state, setState] = useState<ExtensionState>({
 		apiConfiguration: {},
 		version: "",
@@ -311,9 +315,9 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 	const [dataStudioState, setDataStudioState] = useState<any>(undefined)
 	const [researchPipelineState, setResearchPipelineState] = useState<any>(undefined)
 	const [paperWritingState, setPaperWritingState] = useState<any>(undefined)
-	const [paperProjectState, setPaperProjectState] = useState<any>(undefined)
-	const [paperReferenceState, setPaperReferenceState] = useState<any>(undefined)
-	const [paperSnapshotState, setPaperSnapshotState] = useState<any>(undefined)
+	const [paperProjectState, setPaperProjectState] = useState<PaperProjectViewState | undefined>(undefined)
+	const [paperReferenceState, setPaperReferenceState] = useState<PaperReferenceViewState | undefined>(undefined)
+	const [paperSnapshotState, setPaperSnapshotState] = useState<PaperSnapshotViewState | undefined>(undefined)
 	const [includeTaskHistoryInEnhance, setIncludeTaskHistoryInEnhance] = useState(true)
 	const [prevCloudIsAuthenticated, setPrevCloudIsAuthenticated] = useState(false)
 	const [includeCurrentTime, setIncludeCurrentTime] = useState(true)
@@ -342,6 +346,11 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 					const newState = message.state ?? {}
 					setState((prevState) => mergeExtensionState(prevState, newState))
 					setShowWelcome(!checkExistKey(newState.apiConfiguration))
+					if (!didHydrateState) {
+						console.info(
+							`[StartupTrace] frontend:firstStateReceived ${Date.now() - webviewLaunchStartedAtRef.current}ms`,
+						)
+					}
 					setDidHydrateState(true)
 					// Update alwaysAllowFollowupQuestions if present in state message
 					if ((newState as any).alwaysAllowFollowupQuestions !== undefined) {
@@ -533,35 +542,35 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 					break
 				}
 				case "paperProjectState": {
-					if ((message as any).paperProjectState) {
-						setPaperProjectState((prev: any) => ({
+					if (message.paperProjectState) {
+						setPaperProjectState((prev) => ({
 							...(prev ?? {}),
-							...(message as any).paperProjectState,
+							...message.paperProjectState,
 						}))
 					}
 					break
 				}
 				case "paperReferenceState": {
-					if ((message as any).paperReferenceState) {
-						setPaperReferenceState((prev: any) => ({
+					if (message.paperReferenceState) {
+						setPaperReferenceState((prev) => ({
 							...(prev ?? {}),
-							...(message as any).paperReferenceState,
+							...message.paperReferenceState,
 						}))
 					}
 					break
 				}
 				case "paperSnapshotState": {
-					if ((message as any).paperSnapshotState) {
-						setPaperSnapshotState((prev: any) => ({
+					if (message.paperSnapshotState) {
+						setPaperSnapshotState((prev) => ({
 							...(prev ?? {}),
-							...(message as any).paperSnapshotState,
+							...message.paperSnapshotState,
 						}))
 					}
 					break
 				}
 			}
 		},
-		[setListApiConfigMeta],
+		[didHydrateState, setListApiConfigMeta],
 	)
 
 	useEffect(() => {

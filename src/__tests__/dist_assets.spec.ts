@@ -5,6 +5,12 @@ import * as path from "path"
 
 describe("dist assets", () => {
 	const distPath = path.join(__dirname, "../dist")
+	const paperResourceFiles = [
+		["services/paper/templates/generic/main.tex", "paper template"],
+		["services/paper/templates/neurips2025/main.tex", "venue template"],
+		["services/paper/skills/ml-paper-writing/SKILL.md", "paper skill"],
+		["services/paper/rules/writing-standards.md", "paper rule"],
+	]
 
 	describe("tiktoken", () => {
 		it("should have tiktoken wasm file", () => {
@@ -54,6 +60,12 @@ describe("dist assets", () => {
 
 		test.each(treeSitterFiles)("should have %s file", (filename) => {
 			expect(fs.existsSync(path.join(distPath, filename))).toBe(true)
+		})
+	})
+
+	describe("paper writing resources", () => {
+		test.each(paperResourceFiles)("should have %s %s in dist", (relativePath) => {
+			expect(fs.existsSync(path.join(distPath, relativePath))).toBe(true)
 		})
 	})
 })

@@ -1,7 +1,7 @@
 import * as fs from "fs/promises"
 import * as path from "path"
 import type { ClineProvider } from "../../core/webview/ClineProvider"
-import type { ReferenceEntry, Author, RetrievalCandidate } from "@roo-code/types"
+import type { ReferenceEntry, Author, RetrievalCandidate, CitationPlaceholderEntry } from "@roo-code/types"
 
 const LEGACY_ARXIV_ID_PATTERN = String.raw`[a-z-]+(?:\.[A-Z]{2})?/\d{7}(?:v\d+)?`
 const MODERN_ARXIV_ID_PATTERN = String.raw`\d{4}\.\d{4,5}(?:v\d+)?`
@@ -274,10 +274,15 @@ export class ReferenceManager {
 
 	// ─── Citation Scanning ─────────────────────────────────────────────
 
-	async scanTexCitations(): Promise<{ cited: string[]; missing: string[] }> {
+	async scanTexCitations(): Promise<{
+		cited: string[]
+		missing: string[]
+		citationPlaceholders: CitationPlaceholderEntry[]
+	}> {
 		const cwd = this.cwd
-		if (!cwd) return { cited: [], missing: [] }
+		if (!cwd) return { cited: [], missing: [], citationPlaceholders: [] }
 		const allKeys = new Set<string>()
+		const citationPlaceholders: CitationPlaceholderEntry[] = []
 		const texFiles = await this.getTexFilesToScan(cwd)
 
 		for (const filePath of texFiles) {
@@ -287,6 +292,7 @@ export class ReferenceManager {
 				for (const key of keys) {
 					allKeys.add(key)
 				}
+				citationPlaceholders.push(...this.extractCitationPlaceholders(content, filePath))
 			} catch {
 				// Skip unreadable files and keep scanning the rest.
 			}
@@ -301,7 +307,7 @@ export class ReferenceManager {
 			}
 		}
 
-		return { cited, missing }
+		return { cited, missing, citationPlaceholders }
 	}
 
 	private async getTexFilesToScan(projectRoot: string): Promise<string[]> {
@@ -356,10 +362,36 @@ export class ReferenceManager {
 			const keyList = match[1]
 			for (const k of keyList.split(",")) {
 				const trimmed = k.trim()
-				if (trimmed) keys.add(trimmed)
+				if (trimmed && !this.isCitationPlaceholderKey(trimmed)) keys.add(trimmed)
 			}
 		}
 		return Array.from(keys)
+	}
+
+	private extractCitationPlaceholders(content: string, filePath: string): CitationPlaceholderEntry[] {
+		const placeholders: CitationPlaceholderEntry[] = []
+		const lines = content.split(/\r?\n/)
+		const placeholderRegex = /\[CITATION NEEDED(?::([^\]]+))?\]/g
+
+		for (let index = 0; index < lines.length; index++) {
+			let match: RegExpExecArray | null
+			while ((match = placeholderRegex.exec(lines[index])) !== null) {
+				const detail = match[1]?.trim()
+				placeholders.push({
+					text: match[0],
+					detail: detail || undefined,
+					line: index + 1,
+					filePath,
+				})
+			}
+		}
+
+		return placeholders
+	}
+
+	private isCitationPlaceholderKey(value: string): boolean {
+		const normalized = value.replace(/^\[|\]$/g, "").trim()
+		return /^CITATION NEEDED\b/i.test(normalized)
 	}
 
 	// ─── BibTeX Generation ─────────────────────────────────────────────

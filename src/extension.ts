@@ -68,6 +68,10 @@ let authStateChangedHandler: ((data: { state: AuthState; previousState: AuthStat
 let settingsUpdatedHandler: (() => void) | undefined
 let userInfoHandler: ((data: { userInfo: CloudUserInfo }) => Promise<void>) | undefined
 
+const logStartupTrace = (label: string, startMs: number) => {
+	outputChannel.appendLine(`[StartupTrace] ${label}: ${Date.now() - startMs}ms`)
+}
+
 /**
  * Check if we should auto-open the Roo Code sidebar after switching to a worktree.
  * This is called during extension activation to handle the worktree auto-open flow.
@@ -120,21 +124,25 @@ async function checkWorktreeAutoOpen(
 // This method is called when your extension is activated.
 // Your extension is activated the very first time the command is executed.
 export async function activate(context: vscode.ExtensionContext) {
+	const activateStart = Date.now()
 	extensionContext = context
 	outputChannel = vscode.window.createOutputChannel(Package.outputChannel)
 	context.subscriptions.push(outputChannel)
 	outputChannel.appendLine(`${Package.name} extension activated - ${JSON.stringify(Package)}`)
+	outputChannel.appendLine("[StartupTrace] activate:start")
 
 	// Initialize network proxy configuration early, before any network requests.
 	// When proxyUrl is configured, all HTTP/HTTPS traffic will be routed through it.
 	// Only applied in debug mode (F5).
 	await initializeNetworkProxy(context, outputChannel)
+	logStartupTrace("activate:initializeNetworkProxy", activateStart)
 
 	// Set extension path for custom tool registry to find bundled esbuild
 	customToolRegistry.setExtensionPath(context.extensionPath)
 
 	// Migrate old settings to new
 	await migrateSettings(context, outputChannel)
+	logStartupTrace("activate:migrateSettings", activateStart)
 
 	// Initialize telemetry service.
 	const telemetryService = TelemetryService.createInstance()
@@ -150,6 +158,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
 	// Initialize MDM service
 	const mdmService = await MdmService.createInstance(cloudLogger)
+	logStartupTrace("activate:createMdmService", activateStart)
 
 	// Initialize i18n for internationalization support.
 	initializeI18n(context.globalState.get("language") ?? formatLanguage(vscode.env.language))
@@ -169,6 +178,7 @@ export async function activate(context: vscode.ExtensionContext) {
 	}
 
 	const contextProxy = await ContextProxy.getInstance(context)
+	logStartupTrace("activate:getContextProxy", activateStart)
 
 	// Initialize code index managers for all workspace folders.
 	const codeIndexManagers: CodeIndexManager[] = []
@@ -192,9 +202,11 @@ export async function activate(context: vscode.ExtensionContext) {
 			}
 		}
 	}
+	logStartupTrace("activate:scheduleCodeIndexManagers", activateStart)
 
 	// Initialize the provider *before* the Roo Code Cloud service.
 	const provider = new ClineProvider(context, outputChannel, "sidebar", contextProxy, mdmService)
+	logStartupTrace("activate:createProvider", activateStart)
 
 	// Initialize Roo Code Cloud service.
 	const postStateListener = () => ClineProvider.getVisibleInstance()?.postStateToWebviewWithoutClineMessages()
@@ -202,9 +214,28 @@ export async function activate(context: vscode.ExtensionContext) {
 	authStateChangedHandler = async (data: { state: AuthState; previousState: AuthState }) => {
 		postStateListener()
 
+		const isCurrentProviderRoo = async () => {
+			try {
+				const currentConfigName = provider.contextProxy.getGlobalState("currentApiConfigName") || "default"
+				const currentProfile = await provider.providerSettingsManager.getProfile({ name: currentConfigName })
+				return currentProfile.apiProvider === "roo"
+			} catch (error) {
+				cloudLogger(
+					`[authStateChangedHandler] Failed to resolve current provider profile: ${
+						error instanceof Error ? error.message : String(error)
+					}`,
+				)
+				return false
+			}
+		}
+
 		// Handle Roo models cache based on auth state (ROO-202)
 		const handleRooModelsCache = async () => {
 			try {
+				if (!(await isCurrentProviderRoo())) {
+					return
+				}
+
 				if (data.state === "active-session") {
 					// Refresh with auth token to get authenticated models
 					const sessionToken = CloudService.hasInstance()
@@ -269,6 +300,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		"settings-updated": settingsUpdatedHandler,
 		"user-info": userInfoHandler,
 	})
+	logStartupTrace("activate:createCloudService", activateStart)
 
 	try {
 		if (cloudService.telemetryClient) {
@@ -283,14 +315,12 @@ export async function activate(context: vscode.ExtensionContext) {
 	// Add to subscriptions for proper cleanup on deactivate.
 	context.subscriptions.push(cloudService)
 
-	// Trigger initial cloud profile sync now that CloudService is ready.
-	try {
-		await provider.initializeCloudProfileSyncWhenReady()
-	} catch (error) {
+	// Trigger cloud profile sync in the background so activation stays responsive.
+	void provider.initializeCloudProfileSyncWhenReady().catch((error) => {
 		outputChannel.appendLine(
 			`[CloudService] Failed to initialize cloud profile sync: ${error instanceof Error ? error.message : String(error)}`,
 		)
-	}
+	})
 
 	// Finish initializing the provider.
 	TelemetryService.instance.setProvider(provider)
@@ -300,22 +330,21 @@ export async function activate(context: vscode.ExtensionContext) {
 			webviewOptions: { retainContextWhenHidden: true },
 		}),
 	)
+	logStartupTrace("activate:registerWebviewProvider", activateStart)
 
 	// Check for worktree auto-open path (set when switching to a worktree)
-	await checkWorktreeAutoOpen(context, outputChannel)
+	void checkWorktreeAutoOpen(context, outputChannel)
 
 	// Auto-import configuration if specified in settings.
-	try {
-		await autoImportSettings(outputChannel, {
-			providerSettingsManager: provider.providerSettingsManager,
-			contextProxy: provider.contextProxy,
-			customModesManager: provider.customModesManager,
-		})
-	} catch (error) {
+	void autoImportSettings(outputChannel, {
+		providerSettingsManager: provider.providerSettingsManager,
+		contextProxy: provider.contextProxy,
+		customModesManager: provider.customModesManager,
+	}).catch((error) => {
 		outputChannel.appendLine(
 			`[AutoImport] Error during auto-import: ${error instanceof Error ? error.message : String(error)}`,
 		)
-	}
+	})
 
 	registerCommands({ context, outputChannel, provider })
 
@@ -358,6 +387,7 @@ export async function activate(context: vscode.ExtensionContext) {
 	registerPaperEditorActions({ context, provider })
 	registerPaperWorkspaceIntegration({ context, provider })
 	registerTerminalActions(context)
+	logStartupTrace("activate:registerCommandsAndIntegrations", activateStart)
 
 	// Allows other extensions to activate once Roo is ready.
 	vscode.commands.executeCommand(`${Package.name}.activationCompleted`)
@@ -420,6 +450,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
 	// Initialize background model cache refresh
 	initializeModelCacheRefresh()
+	logStartupTrace("activate:complete", activateStart)
 
 	return new API(outputChannel, provider, socketPath, enableLogging)
 }
