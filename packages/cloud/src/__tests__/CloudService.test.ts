@@ -74,6 +74,13 @@ describe("CloudService", () => {
 		backfillMessages: ReturnType<typeof vi.fn>
 	}
 
+	let mockCloudAPI: {
+		getSubscriptionEntitlement: ReturnType<typeof vi.fn>
+		startSubscriptionTrial: ReturnType<typeof vi.fn>
+		createCheckoutSession: ReturnType<typeof vi.fn>
+		getBillingPortalUrl: ReturnType<typeof vi.fn>
+	}
+
 	beforeEach(() => {
 		CloudService.resetInstance()
 
@@ -144,6 +151,13 @@ describe("CloudService", () => {
 
 		mockTelemetryClient = {
 			backfillMessages: vi.fn().mockResolvedValue(undefined),
+		}
+
+		mockCloudAPI = {
+			getSubscriptionEntitlement: vi.fn(),
+			startSubscriptionTrial: vi.fn(),
+			createCheckoutSession: vi.fn(),
+			getBillingPortalUrl: vi.fn(),
 		}
 
 		vi.mocked(WebAuthService).mockImplementation(() => mockAuthService as unknown as WebAuthService)
@@ -489,6 +503,71 @@ describe("CloudService", () => {
 			serviceSettingsListener(settingsData)
 
 			expect(settingsListener).toHaveBeenCalledWith(settingsData)
+		})
+	})
+
+	describe("billing methods", () => {
+		let cloudService: CloudService
+
+		beforeEach(async () => {
+			cloudService = await CloudService.createInstance(mockContext)
+			Reflect.set(cloudService as object, "_cloudAPI", mockCloudAPI)
+		})
+
+		it("delegates getSubscriptionEntitlement to CloudAPI", async () => {
+			const expected = {
+				tier: "plus",
+				status: "active",
+				capabilities: {
+					researchPipeline: true,
+					readPaper: true,
+					paperWriting: false,
+					dataStudio: false,
+				},
+			}
+			mockCloudAPI.getSubscriptionEntitlement.mockResolvedValue(expected)
+
+			const result = await cloudService.getSubscriptionEntitlement()
+
+			expect(mockCloudAPI.getSubscriptionEntitlement).toHaveBeenCalled()
+			expect(result).toEqual(expected)
+		})
+
+		it("delegates startSubscriptionTrial to CloudAPI", async () => {
+			const expected = {
+				tier: "trial",
+				status: "trialing",
+				capabilities: {
+					researchPipeline: true,
+					readPaper: true,
+					paperWriting: true,
+					dataStudio: true,
+				},
+			}
+			mockCloudAPI.startSubscriptionTrial.mockResolvedValue(expected)
+
+			const result = await cloudService.startSubscriptionTrial()
+
+			expect(mockCloudAPI.startSubscriptionTrial).toHaveBeenCalled()
+			expect(result).toEqual(expected)
+		})
+
+		it("delegates createCheckoutSession to CloudAPI", async () => {
+			mockCloudAPI.createCheckoutSession.mockResolvedValue("https://billing.test.com/checkout/max")
+
+			const result = await cloudService.createCheckoutSession("max")
+
+			expect(mockCloudAPI.createCheckoutSession).toHaveBeenCalledWith("max")
+			expect(result).toBe("https://billing.test.com/checkout/max")
+		})
+
+		it("delegates getBillingPortalUrl to CloudAPI", async () => {
+			mockCloudAPI.getBillingPortalUrl.mockResolvedValue("https://billing.test.com/portal")
+
+			const result = await cloudService.getBillingPortalUrl()
+
+			expect(mockCloudAPI.getBillingPortalUrl).toHaveBeenCalled()
+			expect(result).toBe("https://billing.test.com/portal")
 		})
 	})
 

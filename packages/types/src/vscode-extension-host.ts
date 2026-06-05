@@ -16,6 +16,7 @@ import {
 import type { TodoItem } from "./todo.js"
 import type { ReadPaperRetrievalState, ReadPaperWorkspaceConfig } from "./readpaper.js"
 import type { CloudUserInfo, CloudOrganizationMembership, OrganizationAllowList, ShareVisibility } from "./cloud.js"
+import type { SubscriptionEntitlement, SubscriptionTier } from "./billing.js"
 import type { SerializedCustomToolDefinition } from "./custom-tool.js"
 import type { GitCommit } from "./git.js"
 import type { McpServer } from "./mcp.js"
@@ -385,6 +386,7 @@ export type ExtensionState = Pick<
 	cloudAuthSkipModel?: boolean // Flag indicating auth completed without model selection (user should pick 3rd-party provider)
 	cloudApiUrl?: string
 	cloudOrganizations?: CloudOrganizationMembership[]
+	subscriptionEntitlement?: SubscriptionEntitlement
 	sharingEnabled: boolean
 	publicSharingEnabled: boolean
 	organizationAllowList: OrganizationAllowList
@@ -595,6 +597,12 @@ export interface WebviewMessage {
 		| "refreshCustomTools"
 		| "requestModes"
 		| "switchMode"
+		| "enterActivationCode"
+		| "clearActivationCode"
+		| "refreshSubscriptionEntitlement"
+		| "startSubscriptionTrial"
+		| "openBillingCheckout"
+		| "openBillingPortal"
 		| "debugSetting"
 		// Worktree messages
 		| "listWorktrees"
@@ -738,6 +746,7 @@ export interface WebviewMessage {
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	settings?: any
 	url?: string // For openExternal
+	tier?: SubscriptionTier // For billing checkout
 	mpItem?: MarketplaceItem
 	mpInstallOptions?: InstallMarketplaceItemOptions
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any

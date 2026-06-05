@@ -16,6 +16,7 @@ import {
 	type SkillMetadata,
 	type Command,
 	type McpServer,
+	type SubscriptionEntitlement,
 	type ReadPaperRetrievalState,
 	type ReadPaperWorkspaceConfig,
 	type PaperProjectViewState,
@@ -24,6 +25,7 @@ import {
 	RouterModels,
 	ORGANIZATION_ALLOW_ALL,
 	DEFAULT_CHECKPOINT_TIMEOUT_SECONDS,
+	createSubscriptionEntitlement,
 } from "@roo-code/types"
 
 import { findLastIndex } from "@roo/array"
@@ -51,6 +53,7 @@ export interface ExtensionStateContextType extends ExtensionState {
 	organizationSettingsVersion: number
 	cloudIsAuthenticated: boolean
 	cloudOrganizations?: CloudOrganizationMembership[]
+	subscriptionEntitlement?: SubscriptionEntitlement
 	sharingEnabled: boolean
 	publicSharingEnabled: boolean
 	mdmCompliant?: boolean
@@ -232,6 +235,7 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 		terminalShellIntegrationTimeout: 4000,
 		mcpEnabled: true,
 		taskSyncEnabled: false,
+		subscriptionEntitlement: createSubscriptionEntitlement(),
 		currentApiConfigName: "default",
 		listApiConfigMeta: [],
 		mode: defaultModeSlug,

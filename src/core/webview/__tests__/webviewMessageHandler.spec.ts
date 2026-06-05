@@ -38,6 +38,7 @@ vi.mock("../diagnosticsHandler", () => ({
 }))
 
 import type { ModelRecord } from "@roo-code/types"
+import { createSubscriptionEntitlement } from "@roo-code/types"
 
 import { webviewMessageHandler } from "../webviewMessageHandler"
 import type { ClineProvider } from "../ClineProvider"
@@ -56,6 +57,7 @@ const mockFetchOpenAiCodexRateLimitInfo = vi.mocked(fetchOpenAiCodexRateLimitInf
 const mockClineProvider = {
 	getState: vi.fn(),
 	postMessageToWebview: vi.fn(),
+	postStateToWebviewWithoutClineMessages: vi.fn(),
 	customModesManager: {
 		getCustomModes: vi.fn(),
 		deleteCustomMode: vi.fn(),
@@ -79,6 +81,11 @@ const mockClineProvider = {
 	createTask: vi.fn(),
 	createTaskWithHistoryItem: vi.fn(),
 	getSkillsManager: vi.fn(),
+	getRetrievalManager: vi.fn(),
+	getSubscriptionEntitlement: vi.fn(),
+	startSubscriptionTrial: vi.fn(),
+	enterActivationCode: vi.fn(),
+	clearActivationCode: vi.fn(),
 	cwd: "/mock/workspace",
 } as unknown as ClineProvider
 
@@ -87,14 +94,18 @@ import { t } from "../../../i18n"
 vi.mock("vscode", () => {
 	const showInformationMessage = vi.fn()
 	const showErrorMessage = vi.fn()
+	const showWarningMessage = vi.fn()
 	const openTextDocument = vi.fn().mockResolvedValue({})
 	const showTextDocument = vi.fn().mockResolvedValue(undefined)
 	const showOpenDialog = vi.fn()
+	const openExternal = vi.fn().mockResolvedValue(true)
+	const parse = vi.fn((value: string) => value)
 
 	return {
 		window: {
 			showInformationMessage,
 			showErrorMessage,
+			showWarningMessage,
 			showTextDocument,
 			showOpenDialog,
 		},
@@ -104,6 +115,9 @@ vi.mock("vscode", () => {
 		},
 		Uri: {
 			file: vi.fn((fsPath: string) => ({ fsPath })),
+      parse,
+		env: {
+			openExternal,
 		},
 	}
 })
@@ -334,6 +348,59 @@ describe("webviewMessageHandler - newTask", () => {
 			{ mode: "sci-lit-review" },
 		)
 		expect(mockClineProvider.postMessageToWebview).toHaveBeenCalledWith({ type: "invoke", invoke: "newChat" })
+    })
+})
+  
+describe("webviewMessageHandler - premium gating", () => {
+	beforeEach(() => {
+		vi.clearAllMocks()
+		vi.mocked(mockClineProvider.getRetrievalManager).mockReturnValue(undefined as any)
+		vi.mocked(mockClineProvider.postMessageToWebview).mockResolvedValue(undefined as any)
+		vi.mocked(mockClineProvider.postStateToWebviewWithoutClineMessages).mockResolvedValue(undefined as any)
+		vi.mocked(mockClineProvider.enterActivationCode).mockResolvedValue(null)
+	})
+
+	it("starts a trial the first time a premium feature is opened from the free plan", async () => {
+		vi.mocked(mockClineProvider.getSubscriptionEntitlement).mockResolvedValue(
+			createSubscriptionEntitlement({ tier: "free" }),
+		)
+		vi.mocked(mockClineProvider.startSubscriptionTrial).mockResolvedValue(
+			createSubscriptionEntitlement({
+				tier: "trial",
+				trialStartedAt: "2099-01-01T00:00:00.000Z",
+				trialEndsAt: "2099-01-08T00:00:00.000Z",
+			}),
+		)
+
+		await webviewMessageHandler(mockClineProvider, {
+			type: "readPaperListRetrievals",
+		})
+
+		expect(mockClineProvider.startSubscriptionTrial).toHaveBeenCalledTimes(1)
+		expect(mockClineProvider.postStateToWebviewWithoutClineMessages).toHaveBeenCalledTimes(1)
+		expect(vi.mocked(vscode.window.showWarningMessage)).not.toHaveBeenCalled()
+	})
+
+	it("blocks access and prompts for an activation code when the current plan lacks access", async () => {
+		vi.mocked(mockClineProvider.getSubscriptionEntitlement).mockResolvedValue(
+			createSubscriptionEntitlement({
+				tier: "plus",
+			}),
+		)
+		vi.mocked(vscode.window.showWarningMessage).mockResolvedValue("Enter Activation Code" as any)
+		vi.mocked(mockClineProvider.enterActivationCode).mockResolvedValue(
+			createSubscriptionEntitlement({
+				tier: "pro",
+			}),
+		)
+
+		await webviewMessageHandler(mockClineProvider, {
+			type: "paperWritingList",
+		})
+
+		expect(mockClineProvider.startSubscriptionTrial).not.toHaveBeenCalled()
+		expect(mockClineProvider.enterActivationCode).toHaveBeenCalledWith("pro")
+		expect(mockClineProvider.postStateToWebviewWithoutClineMessages).toHaveBeenCalledTimes(1)
 	})
 })
 

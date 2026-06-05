@@ -10,6 +10,8 @@ import {
 	type Language,
 	type GlobalState,
 	type ClineMessage,
+	type SubscriptionCapabilityKey,
+	type SubscriptionTier,
 	type TelemetrySetting,
 	type UserSettingsConfig,
 	type ModelRecord,
@@ -21,6 +23,8 @@ import {
 	ExperimentId,
 	checkoutDiffPayloadSchema,
 	checkoutRestorePayloadSchema,
+	hasSubscriptionCapability,
+	isSubscriptionTrialExpired,
 } from "@roo-code/types"
 import { customToolRegistry } from "@roo-code/core"
 import { CloudService } from "@roo-code/cloud"
@@ -194,6 +198,41 @@ export const webviewMessageHandler = async (
 		}
 
 		return commandList
+	}
+
+	const premiumFeatureMeta: Record<SubscriptionCapabilityKey, { label: string; minimumTier: SubscriptionTier }> = {
+		researchPipeline: { label: "Research Pipeline", minimumTier: "plus" },
+		readPaper: { label: "Read Paper", minimumTier: "plus" },
+		paperWriting: { label: "Paper Writing", minimumTier: "pro" },
+		dataStudio: { label: "Data Studio", minimumTier: "max" },
+	}
+
+	const ensurePremiumCapability = async (capability: SubscriptionCapabilityKey): Promise<boolean> => {
+		let entitlement = await provider.getSubscriptionEntitlement()
+
+		if (entitlement.tier === "free" && !entitlement.trialStartedAt) {
+			entitlement = await provider.startSubscriptionTrial()
+			await provider.postStateToWebviewWithoutClineMessages()
+		}
+
+		if (hasSubscriptionCapability(entitlement, capability) && !isSubscriptionTrialExpired(entitlement)) {
+			return true
+		}
+
+		const action = await vscode.window.showWarningMessage(
+			`${premiumFeatureMeta[capability].label} requires the ${premiumFeatureMeta[capability].minimumTier.toUpperCase()} tier. Enter an activation code to continue using this feature.`,
+			"Enter Activation Code",
+		)
+
+		if (action === "Enter Activation Code") {
+			const activatedEntitlement = await provider.enterActivationCode(premiumFeatureMeta[capability].minimumTier)
+			if (activatedEntitlement) {
+				await provider.postStateToWebviewWithoutClineMessages()
+				return hasSubscriptionCapability(activatedEntitlement, capability)
+			}
+		}
+
+		return false
 	}
 
 	/**
@@ -1342,6 +1381,26 @@ export const webviewMessageHandler = async (
 				vscode.env.openExternal(vscode.Uri.parse(message.url))
 			}
 			break
+		case "refreshSubscriptionEntitlement": {
+			await provider.getSubscriptionEntitlement({ force: true })
+			await provider.postStateToWebviewWithoutClineMessages()
+			break
+		}
+		case "enterActivationCode": {
+			await provider.enterActivationCode(message.tier)
+			await provider.postStateToWebviewWithoutClineMessages()
+			break
+		}
+		case "clearActivationCode": {
+			await provider.clearActivationCode()
+			await provider.postStateToWebviewWithoutClineMessages()
+			break
+		}
+		case "startSubscriptionTrial": {
+			await provider.startSubscriptionTrial()
+			await provider.postStateToWebviewWithoutClineMessages()
+			break
+		}
 		case "checkpointDiff":
 			const result = checkoutDiffPayloadSchema.safeParse(message.payload)
 
@@ -3133,58 +3192,100 @@ export const webviewMessageHandler = async (
 			break
 		}
 		case "readPaperListRetrievals": {
+			if (!(await ensurePremiumCapability("readPaper"))) {
+				break
+			}
 			await handleReadPaperListRetrievals(provider, message)
 			break
 		}
 		case "readPaperGetWorkspaceConfig": {
+			if (!(await ensurePremiumCapability("readPaper"))) {
+				break
+			}
 			await handleReadPaperGetWorkspaceConfig(provider, message)
 			break
 		}
 		case "readPaperUpdateWorkspaceConfig": {
+			if (!(await ensurePremiumCapability("readPaper"))) {
+				break
+			}
 			await handleReadPaperUpdateWorkspaceConfig(provider, message)
 			break
 		}
 		case "readPaperResetWorkspaceConfig": {
+			if (!(await ensurePremiumCapability("readPaper"))) {
+				break
+			}
 			await handleReadPaperResetWorkspaceConfig(provider, message)
 			break
 		}
 		case "readPaperCreateRetrieval": {
+			if (!(await ensurePremiumCapability("readPaper"))) {
+				break
+			}
 			await handleReadPaperCreateRetrieval(provider, message)
 			break
 		}
 		case "readPaperUpdateRetrieval": {
+			if (!(await ensurePremiumCapability("readPaper"))) {
+				break
+			}
 			await handleReadPaperUpdateRetrieval(provider, message)
 			break
 		}
 		case "readPaperRunRetrieval": {
+			if (!(await ensurePremiumCapability("readPaper"))) {
+				break
+			}
 			await handleReadPaperRunRetrieval(provider, message)
 			break
 		}
 		case "readPaperUpdateCandidate": {
+			if (!(await ensurePremiumCapability("readPaper"))) {
+				break
+			}
 			await handleReadPaperUpdateCandidate(provider, message)
 			break
 		}
 		case "readPaperConfirmRetrieval": {
+			if (!(await ensurePremiumCapability("readPaper"))) {
+				break
+			}
 			await handleReadPaperConfirmRetrieval(provider, message)
 			break
 		}
 		case "readPaperArchiveRetrieval": {
+			if (!(await ensurePremiumCapability("readPaper"))) {
+				break
+			}
 			await handleReadPaperArchiveRetrieval(provider, message)
 			break
 		}
 		case "readPaperDeleteRetrieval": {
+			if (!(await ensurePremiumCapability("readPaper"))) {
+				break
+			}
 			await handleReadPaperDeleteRetrieval(provider, message)
 			break
 		}
 		case "readPaperDeleteRetrievalWithImportedEntries": {
+			if (!(await ensurePremiumCapability("readPaper"))) {
+				break
+			}
 			await handleReadPaperDeleteRetrievalWithImportedEntries(provider, message)
 			break
 		}
 		case "readPaperImportCandidate": {
+			if (!(await ensurePremiumCapability("readPaper"))) {
+				break
+			}
 			await handleReadPaperImportCandidate(provider, message)
 			break
 		}
 		case "readPaperImportRetrieval": {
+			if (!(await ensurePremiumCapability("readPaper"))) {
+				break
+			}
 			await handleReadPaperImportRetrieval(provider, message)
 			break
 		}
@@ -3193,36 +3294,60 @@ export const webviewMessageHandler = async (
 			break
 		}
 		case "dataStudioRun": {
+			if (!(await ensurePremiumCapability("dataStudio"))) {
+				break
+			}
 			await handleDataStudioRun(provider, message)
 			break
 		}
 		case "dataStudioList": {
+			if (!(await ensurePremiumCapability("dataStudio"))) {
+				break
+			}
 			await handleDataStudioList(provider)
 			break
 		}
 		case "researchPipelineRun": {
+			if (!(await ensurePremiumCapability("researchPipeline"))) {
+				break
+			}
 			await handleResearchPipelineRun(provider, message)
 			break
 		}
 		case "researchPipelineList": {
+			if (!(await ensurePremiumCapability("researchPipeline"))) {
+				break
+			}
 			await handleResearchPipelineList(provider)
 			break
 		}
 		case "paperWritingAction": {
+			if (!(await ensurePremiumCapability("paperWriting"))) {
+				break
+			}
 			await handlePaperWritingAction(provider, message)
 			break
 		}
 		case "paperWritingList": {
+			if (!(await ensurePremiumCapability("paperWriting"))) {
+				break
+			}
 			await handlePaperWritingList(provider)
 			break
 		}
 		case "paperWritingAiOp": {
+			if (!(await ensurePremiumCapability("paperWriting"))) {
+				break
+			}
 			await handlePaperWritingAiOp(provider, message)
 			break
 		}
 		// Paper Writing v2 — project load/list
 		case "paperProjectList":
 		case "paperProjectLoad": {
+			if (!(await ensurePremiumCapability("paperWriting"))) {
+				break
+			}
 			await handlePaperWritingList(provider)
 			break
 		}
@@ -3245,6 +3370,9 @@ export const webviewMessageHandler = async (
 		case "paperSnapshotRestore":
 		case "paperVenueSwitch":
 		case "paperMarkdownExport": {
+			if (!(await ensurePremiumCapability("paperWriting"))) {
+				break
+			}
 			await handlePaperWritingAction(provider, message)
 			break
 		}

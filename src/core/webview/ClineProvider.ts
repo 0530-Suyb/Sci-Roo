@@ -31,6 +31,8 @@ import {
 	type HistoryItem,
 	type CloudUserInfo,
 	type CloudOrganizationMembership,
+	type SubscriptionEntitlement,
+	type SubscriptionTier,
 	type CreateTaskOptions,
 	type TokenUsage,
 	type ToolUsage,
@@ -44,6 +46,7 @@ import {
 	ORGANIZATION_ALLOW_ALL,
 	DEFAULT_MODES,
 	DEFAULT_CHECKPOINT_TIMEOUT_SECONDS,
+	createSubscriptionEntitlement,
 	getModelId,
 	isRetiredProvider,
 } from "@roo-code/types"
@@ -112,6 +115,13 @@ import { getNonce } from "./getNonce"
 import { getUri } from "./getUri"
 import { REQUESTY_BASE_URL } from "../../shared/utils/requesty"
 import { validateAndFixToolResultIds } from "../task/validateToolResultIds"
+import {
+	createEntitlementFromActivationRecord,
+	createLocalActivationRecord,
+	getTierFromActivationCode,
+	isActivationTierSufficient,
+	type LocalActivationRecord,
+} from "../billing/localActivation"
 
 /**
  * https://github.com/microsoft/vscode-webview-ui-toolkit-samples/blob/main/default/weather-webview/src/providers/WeatherViewProvider.ts
@@ -179,6 +189,11 @@ export class ClineProvider
 	private cloudOrganizationsCache: CloudOrganizationMembership[] | null = null
 	private cloudOrganizationsCacheTimestamp: number | null = null
 	private static readonly CLOUD_ORGANIZATIONS_CACHE_DURATION_MS = 5 * 1000 // 5 seconds
+	private subscriptionEntitlementCache: SubscriptionEntitlement = createSubscriptionEntitlement()
+	private subscriptionEntitlementCacheTimestamp: number | null = null
+	private static readonly SUBSCRIPTION_ENTITLEMENT_CACHE_DURATION_MS = 60 * 1000 // 1 minute
+	private static readonly LOCAL_TRIAL_DURATION_MS = 10 * 1000 // 10 seconds for local activation testing
+	private static readonly ENABLE_WEBVIEW_HMR = process.env.SCI_ROO_ENABLE_WEBVIEW_HMR === "true"
 
 	/**
 	 * Monotonically increasing sequence number for clineMessages state pushes.
@@ -995,7 +1010,7 @@ export class ClineProvider
 		}
 
 		webviewView.webview.html =
-			this.contextProxy.extensionMode === vscode.ExtensionMode.Development
+			this.contextProxy.extensionMode === vscode.ExtensionMode.Development && ClineProvider.ENABLE_WEBVIEW_HMR
 				? await this.getHMRHtmlContent(webviewView.webview)
 				: await this.getHtmlContent(webviewView.webview)
 		this.log(`[StartupTrace] resolveWebviewView:htmlReady ${Date.now() - resolveStart}ms`)
@@ -2185,6 +2200,165 @@ export class ClineProvider
 		}
 	}
 
+	private getLocalTrialFallbackStorageKey(): string {
+		return "subscriptionTrialFallback"
+	}
+
+	private getLocalActivationStorageKey(): string {
+		return "subscriptionActivationRecord"
+	}
+
+	private getStoredLocalActivationRecord(): LocalActivationRecord | undefined {
+		return this.context.globalState.get<LocalActivationRecord>(this.getLocalActivationStorageKey())
+	}
+
+	private getStoredLocalTrialFallback(): SubscriptionEntitlement | undefined {
+		const stored = this.context.globalState.get<SubscriptionEntitlement>(this.getLocalTrialFallbackStorageKey())
+		if (!stored) {
+			return undefined
+		}
+
+		const trialEndsAtMs = stored.trialEndsAt ? Date.parse(stored.trialEndsAt) : Number.NaN
+		if (!Number.isNaN(trialEndsAtMs) && trialEndsAtMs <= Date.now()) {
+			return createSubscriptionEntitlement({
+				tier: "free",
+				status: "expired",
+				trialStartedAt: stored.trialStartedAt,
+				trialEndsAt: stored.trialEndsAt,
+				lastCheckedAt: new Date().toISOString(),
+			})
+		}
+
+		return createSubscriptionEntitlement(stored)
+	}
+
+	private async persistLocalTrialFallback(entitlement: SubscriptionEntitlement | null): Promise<void> {
+		await this.context.globalState.update(this.getLocalTrialFallbackStorageKey(), entitlement ?? undefined)
+	}
+
+	private async persistLocalActivationRecord(record: LocalActivationRecord | null): Promise<void> {
+		await this.context.globalState.update(this.getLocalActivationStorageKey(), record ?? undefined)
+	}
+
+	private setSubscriptionEntitlementCache(entitlement: SubscriptionEntitlement): SubscriptionEntitlement {
+		this.subscriptionEntitlementCache = createSubscriptionEntitlement({
+			...entitlement,
+			lastCheckedAt: entitlement.lastCheckedAt ?? new Date().toISOString(),
+		})
+		this.subscriptionEntitlementCacheTimestamp = Date.now()
+		return this.subscriptionEntitlementCache
+	}
+
+	public async getSubscriptionEntitlement(options?: { force?: boolean }): Promise<SubscriptionEntitlement> {
+		const now = Date.now()
+		if (
+			!options?.force &&
+			this.subscriptionEntitlementCacheTimestamp !== null &&
+			now - this.subscriptionEntitlementCacheTimestamp < ClineProvider.SUBSCRIPTION_ENTITLEMENT_CACHE_DURATION_MS
+		) {
+			return this.subscriptionEntitlementCache
+		}
+
+		const localActivation = this.getStoredLocalActivationRecord()
+		if (localActivation) {
+			return this.setSubscriptionEntitlementCache(createEntitlementFromActivationRecord(localActivation))
+		}
+
+		return this.setSubscriptionEntitlementCache(
+			this.getStoredLocalTrialFallback() ??
+				createSubscriptionEntitlement({
+					lastCheckedAt: new Date().toISOString(),
+				}),
+		)
+	}
+
+	public async startSubscriptionTrial(): Promise<SubscriptionEntitlement> {
+		const localActivation = this.getStoredLocalActivationRecord()
+		if (localActivation) {
+			return this.setSubscriptionEntitlementCache(createEntitlementFromActivationRecord(localActivation))
+		}
+
+		const existingTrial = this.context.globalState.get<SubscriptionEntitlement>(
+			this.getLocalTrialFallbackStorageKey(),
+		)
+		if (existingTrial) {
+			return this.setSubscriptionEntitlementCache(
+				this.getStoredLocalTrialFallback() ??
+					createSubscriptionEntitlement({
+						tier: "free",
+						status: "expired",
+						trialStartedAt: existingTrial.trialStartedAt,
+						trialEndsAt: existingTrial.trialEndsAt,
+						lastCheckedAt: new Date().toISOString(),
+					}),
+			)
+		}
+
+		const now = new Date()
+		const trialEndsAt = new Date(now.getTime() + ClineProvider.LOCAL_TRIAL_DURATION_MS)
+		const localTrial = this.setSubscriptionEntitlementCache(
+			createSubscriptionEntitlement({
+				tier: "trial",
+				status: "trialing",
+				trialStartedAt: now.toISOString(),
+				trialEndsAt: trialEndsAt.toISOString(),
+				lastCheckedAt: now.toISOString(),
+			}),
+		)
+		await this.persistLocalTrialFallback(localTrial)
+		return localTrial
+	}
+
+	public async enterActivationCode(requiredTier?: SubscriptionTier): Promise<SubscriptionEntitlement | null> {
+		const prompt =
+			requiredTier && requiredTier !== "free" && requiredTier !== "trial"
+				? `Enter a ${requiredTier.toUpperCase()} activation code or higher`
+				: "Enter your activation code"
+		const value = await vscode.window.showInputBox({
+			prompt,
+			placeHolder: "PLUS-XXXX-XXXX or SCI-PRO-XXXX-XXXX",
+			ignoreFocusOut: true,
+			password: true,
+		})
+
+		if (!value) {
+			return null
+		}
+
+		const activationRecord = createLocalActivationRecord(value)
+		if (!activationRecord) {
+			await vscode.window.showErrorMessage("The activation code is invalid or not in the local whitelist.")
+			return null
+		}
+
+		if (!isActivationTierSufficient(activationRecord.tier, requiredTier)) {
+			const actualTier = getTierFromActivationCode(value)?.toUpperCase() ?? "UNKNOWN"
+			await vscode.window.showErrorMessage(
+				`This activation code unlocks ${actualTier}, but ${requiredTier?.toUpperCase()} access is required for this feature.`,
+			)
+			return null
+		}
+
+		await this.persistLocalActivationRecord(activationRecord)
+		const entitlement = this.setSubscriptionEntitlementCache(
+			createEntitlementFromActivationRecord(activationRecord),
+		)
+		await vscode.window.showInformationMessage(
+			`${activationRecord.tier.toUpperCase()} access activated on this device.`,
+		)
+		return entitlement
+	}
+
+	public async clearActivationCode(): Promise<SubscriptionEntitlement> {
+		await this.persistLocalActivationRecord(null)
+		return this.getSubscriptionEntitlement({ force: true })
+	}
+
+	public async resetSubscriptionTrial(): Promise<SubscriptionEntitlement> {
+		await this.persistLocalTrialFallback(null)
+		return this.getSubscriptionEntitlement({ force: true })
+	}
+
 	/**
 	 * Fetches marketplace data on demand to avoid blocking main state updates
 	 */
@@ -2395,6 +2569,7 @@ export class ClineProvider
 			// Ignore this error.
 		}
 
+		const subscriptionEntitlement = await this.getSubscriptionEntitlement()
 		const telemetryKey = process.env.POSTHOG_API_KEY
 		const machineId = vscode.env.machineId
 		const mergedAllowedCommands = this.mergeAllowedCommands(allowedCommands)
@@ -2478,6 +2653,7 @@ export class ClineProvider
 			cloudIsAuthenticated: cloudIsAuthenticated ?? false,
 			cloudAuthSkipModel: this.context.globalState.get<boolean>("roo-auth-skip-model") ?? false,
 			cloudOrganizations,
+			subscriptionEntitlement,
 			sharingEnabled: sharingEnabled ?? false,
 			publicSharingEnabled: publicSharingEnabled ?? false,
 			organizationAllowList,
@@ -2543,6 +2719,7 @@ export class ClineProvider
 	> {
 		const stateValues = this.contextProxy.getValues()
 		const customModes = await this.customModesManager.getCustomModes()
+		const subscriptionEntitlement = await this.getSubscriptionEntitlement()
 
 		// Determine apiProvider with the same logic as before, while filtering retired providers.
 		const apiProvider: ProviderName =
@@ -2699,6 +2876,7 @@ export class ClineProvider
 			enterBehavior: stateValues.enterBehavior ?? "send",
 			cloudUserInfo,
 			cloudIsAuthenticated,
+			subscriptionEntitlement,
 			sharingEnabled,
 			publicSharingEnabled,
 			organizationAllowList,

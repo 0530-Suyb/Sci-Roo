@@ -12,6 +12,8 @@ import type {
 	OrganizationAllowList,
 	OrganizationSettings,
 	ShareVisibility,
+	SubscriptionEntitlement,
+	SubscriptionTier,
 	UserSettingsConfig,
 	UserSettingsData,
 	UserFeatures,
@@ -340,6 +342,26 @@ export class CloudService extends EventEmitter<CloudServiceEvents> implements Di
 	public async canSharePublicly(): Promise<boolean> {
 		this.ensureInitialized()
 		return this.shareService!.canSharePublicly()
+	}
+
+	public async getSubscriptionEntitlement(): Promise<SubscriptionEntitlement> {
+		this.ensureInitialized()
+		return this.cloudAPI!.getSubscriptionEntitlement()
+	}
+
+	public async startSubscriptionTrial(): Promise<SubscriptionEntitlement> {
+		this.ensureInitialized()
+		return this.cloudAPI!.startSubscriptionTrial()
+	}
+
+	public async createCheckoutSession(tier: SubscriptionTier): Promise<string> {
+		this.ensureInitialized()
+		return this.cloudAPI!.createCheckoutSession(tier)
+	}
+
+	public async getBillingPortalUrl(): Promise<string> {
+		this.ensureInitialized()
+		return this.cloudAPI!.getBillingPortalUrl()
 	}
 
 	// Lifecycle

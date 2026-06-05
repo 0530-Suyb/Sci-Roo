@@ -212,6 +212,7 @@ export async function activate(context: vscode.ExtensionContext) {
 	const postStateListener = () => ClineProvider.getVisibleInstance()?.postStateToWebviewWithoutClineMessages()
 
 	authStateChangedHandler = async (data: { state: AuthState; previousState: AuthState }) => {
+		await provider.getSubscriptionEntitlement({ force: true }).catch(() => undefined)
 		postStateListener()
 
 		const isCurrentProviderRoo = async () => {
@@ -292,6 +293,7 @@ export async function activate(context: vscode.ExtensionContext) {
 	}
 
 	userInfoHandler = async ({ userInfo }: { userInfo: CloudUserInfo }) => {
+		await provider.getSubscriptionEntitlement({ force: true }).catch(() => undefined)
 		postStateListener()
 	}
 

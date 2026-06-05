@@ -88,6 +88,13 @@ Sci-Roo 额外提供 7 个研究模式：
 - [AGENTS.md](AGENTS.md): 给 AI agent 的仓库规则，不是开发者主入口
 - [CONTRIBUTING.md](CONTRIBUTING.md): 通用贡献流程
 
+## Premium Flow Status
+
+- Current default premium flow: local trial + local activation code
+- Current dev guide: [docs/dev/billing-local-dev.md](docs/dev/billing-local-dev.md)
+- Future server-backed website billing scaffold: [docs/dev/billing-api.md](docs/dev/billing-api.md)
+- Website billing code is retained for future integration and is not the active default unlock path today
+
 ## Notes
 
 - 当前仓库继承了 Roo Code 的 monorepo 基础设施，因此部分脚本、贡献流程与目录会保留 Roo Code 的约定。

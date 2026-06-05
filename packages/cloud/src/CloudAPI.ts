@@ -1,6 +1,14 @@
 import { z } from "zod"
 
-import { type AuthService, type ShareVisibility, type ShareResponse, shareResponseSchema } from "@roo-code/types"
+import {
+	type AuthService,
+	type ShareVisibility,
+	type ShareResponse,
+	type SubscriptionEntitlement,
+	type SubscriptionTier,
+	normalizeSubscriptionEntitlement,
+	shareResponseSchema,
+} from "@roo-code/types"
 
 import { getRooCodeApiUrl } from "./config.js"
 import { getUserAgent } from "./utils.js"
@@ -142,6 +150,36 @@ export class CloudAPI {
 				const result = z.object({ balance: z.number() }).parse(data)
 				return result.balance
 			},
+		})
+	}
+
+	async getSubscriptionEntitlement(): Promise<SubscriptionEntitlement> {
+		return this.request("/api/extension/entitlements", {
+			method: "GET",
+			parseResponse: (data) => normalizeSubscriptionEntitlement(data),
+		})
+	}
+
+	async startSubscriptionTrial(): Promise<SubscriptionEntitlement> {
+		return this.request("/api/extension/trial/start", {
+			method: "POST",
+			body: JSON.stringify({}),
+			parseResponse: (data) => normalizeSubscriptionEntitlement(data),
+		})
+	}
+
+	async createCheckoutSession(tier: SubscriptionTier): Promise<string> {
+		return this.request("/api/extension/billing/checkout-session", {
+			method: "POST",
+			body: JSON.stringify({ tier }),
+			parseResponse: (data) => z.object({ url: z.string().url() }).parse(data).url,
+		})
+	}
+
+	async getBillingPortalUrl(): Promise<string> {
+		return this.request("/api/extension/billing/portal-url", {
+			method: "GET",
+			parseResponse: (data) => z.object({ url: z.string().url() }).parse(data).url,
 		})
 	}
 }

@@ -139,11 +139,6 @@ const getCommandsMap = ({
 		visibleProvider.postMessageToWebview({ type: "action", action: "marketplaceButtonClicked" })
 	},
 
-	literatureButtonClicked: () => {
-		const visibleProvider = getVisibleProviderOrLog(outputChannel)
-		if (!visibleProvider) return
-		visibleProvider.postMessageToWebview({ type: "action", action: "literatureButtonClicked" })
-	},
 	readPaperButtonClicked: () => {
 		const visibleProvider = getVisibleProviderOrLog(outputChannel)
 		if (!visibleProvider) return
@@ -163,6 +158,30 @@ const getCommandsMap = ({
 		const visibleProvider = getVisibleProviderOrLog(outputChannel)
 		if (!visibleProvider) return
 		visibleProvider.postMessageToWebview({ type: "action", action: "paperWritingButtonClicked" })
+	},
+	enterActivationCode: async () => {
+		const visibleProvider = getVisibleProviderOrLog(outputChannel)
+		if (!visibleProvider) return
+		await visibleProvider.enterActivationCode()
+		await visibleProvider.postStateToWebviewWithoutClineMessages()
+	},
+	clearActivationCode: async () => {
+		const visibleProvider = getVisibleProviderOrLog(outputChannel)
+		if (!visibleProvider) return
+		await visibleProvider.clearActivationCode()
+		await visibleProvider.postStateToWebviewWithoutClineMessages()
+	},
+	resetSubscriptionTrial: async () => {
+		const visibleProvider = getVisibleProviderOrLog(outputChannel)
+		if (!visibleProvider) return
+		await visibleProvider.resetSubscriptionTrial()
+		await visibleProvider.postStateToWebviewWithoutClineMessages()
+	},
+	refreshSubscriptionEntitlement: async () => {
+		const visibleProvider = getVisibleProviderOrLog(outputChannel)
+		if (!visibleProvider) return
+		await visibleProvider.getSubscriptionEntitlement({ force: true })
+		await visibleProvider.postStateToWebviewWithoutClineMessages()
 	},
 	newTask: handleNewTask,
 	setCustomStoragePath: async () => {

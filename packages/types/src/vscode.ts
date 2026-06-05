@@ -35,7 +35,6 @@ export const commandIds = [
 	"popoutButtonClicked",
 	"cloudButtonClicked",
 	"settingsButtonClicked",
-	"literatureButtonClicked",
 	"readPaperButtonClicked",
 	"dataStudioButtonClicked",
 	"researchPipelineButtonClicked",
@@ -63,6 +62,10 @@ export const commandIds = [
 	"paperBuildManuscript",
 	"paperViewPdf",
 	"paperOpenSourceControl",
+	"enterActivationCode",
+	"clearActivationCode",
+	"resetSubscriptionTrial",
+	"refreshSubscriptionEntitlement",
 
 	"openInNewTab",
 

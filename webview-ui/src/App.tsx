@@ -2,7 +2,13 @@ import React, { useCallback, useEffect, useRef, useState, useMemo } from "react"
 import { useEvent } from "react-use"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 
-import { type ExtensionMessage, type RooCodeSettings, TelemetryEventName } from "@roo-code/types"
+import {
+	type ExtensionMessage,
+	type SubscriptionCapabilityKey,
+	type SubscriptionTier,
+  type RooCodeSettings,
+	TelemetryEventName,
+} from "@roo-code/types"
 
 import TranslationProvider from "./i18n/TranslationContext"
 import { MarketplaceViewStateManager } from "./components/marketplace/MarketplaceViewStateManager"
@@ -20,14 +26,15 @@ import { CheckpointRestoreDialog } from "./components/chat/CheckpointRestoreDial
 import { DeleteMessageDialog, EditMessageDialog } from "./components/chat/MessageModificationConfirmationDialog"
 import ErrorBoundary from "./components/ErrorBoundary"
 import { CloudView } from "./components/cloud/CloudView"
-import LiteratureView from "./components/literature/LiteratureView"
 import ReadPaperView from "./components/read-paper/ReadPaperView"
 import DataStudioView from "./components/data-studio/DataStudioView"
 import ResearchPipelineView from "./components/research/ResearchPipelineView"
 import PaperWritingView from "./components/paper/PaperWritingView"
+import PremiumAccessView from "./components/billing/PremiumAccessView"
 import { useAddNonInteractiveClickListener } from "./components/ui/hooks/useNonInteractiveClick"
 import { TooltipProvider } from "./components/ui/tooltip"
 import { STANDARD_TOOLTIP_DELAY } from "./components/ui/standard-tooltip"
+import { canAccessPremiumFeature, shouldAutoStartTrial } from "./utils/subscription"
 
 type Tab =
 	| "settings"
@@ -35,7 +42,6 @@ type Tab =
 	| "chat"
 	| "marketplace"
 	| "cloud"
-	| "literature"
 	| "readPaper"
 	| "dataStudio"
 	| "researchPipeline"
@@ -81,11 +87,29 @@ const tabsByMessageAction: Partial<Record<NonNullable<ExtensionMessage["action"]
 	historyButtonClicked: "history",
 	marketplaceButtonClicked: "marketplace",
 	cloudButtonClicked: "cloud",
-	literatureButtonClicked: "literature",
 	readPaperButtonClicked: "readPaper",
 	dataStudioButtonClicked: "dataStudio",
 	researchPipelineButtonClicked: "researchPipeline",
 	paperWritingButtonClicked: "paperWriting",
+}
+
+const formatAccessExpiry = (value?: string) => {
+	if (!value) {
+		return null
+	}
+
+	const date = new Date(value)
+	if (Number.isNaN(date.getTime())) {
+		return null
+	}
+
+	return new Intl.DateTimeFormat(undefined, {
+		month: "2-digit",
+		day: "2-digit",
+		hour: "2-digit",
+		minute: "2-digit",
+		second: "2-digit",
+	}).format(date)
 }
 
 const App = () => {
@@ -100,6 +124,7 @@ const App = () => {
 		cloudIsAuthenticated,
 		cloudApiUrl,
 		cloudOrganizations,
+		subscriptionEntitlement,
 		renderContext,
 		mdmCompliant,
 		currentTaskId,
@@ -110,6 +135,10 @@ const App = () => {
 
 	const [showAnnouncement, setShowAnnouncement] = useState(false)
 	const [tab, setTab] = useState<Tab>("researchPipeline")
+	const [lockedTab, setLockedTab] = useState<Tab | null>(null)
+	const accessExpiry = subscriptionEntitlement?.trialEndsAt ?? subscriptionEntitlement?.currentPeriodEndsAt
+	const formattedAccessExpiry = formatAccessExpiry(accessExpiry)
+	const showAccessExpiryBadge = Boolean(formattedAccessExpiry && subscriptionEntitlement?.tier !== "free")
 
 	const [deleteMessageDialogState, setDeleteMessageDialogState] = useState<DeleteMessageDialogState>({
 		isOpen: false,
@@ -128,6 +157,29 @@ const App = () => {
 	const settingsRef = useRef<SettingsViewRef>(null)
 	const chatViewRef = useRef<ChatViewRef>(null)
 
+	const premiumTabRequirements: Partial<
+		Record<Tab, { capability: SubscriptionCapabilityKey; minimumTier: SubscriptionTier; featureLabel: string }>
+	> = useMemo(
+		() => ({
+			researchPipeline: {
+				capability: "researchPipeline",
+				minimumTier: "plus",
+				featureLabel: "Research Pipeline",
+			},
+			readPaper: { capability: "readPaper", minimumTier: "plus", featureLabel: "Read Paper" },
+			paperWriting: { capability: "paperWriting", minimumTier: "pro", featureLabel: "Paper Writing" },
+			dataStudio: { capability: "dataStudio", minimumTier: "max", featureLabel: "Data Studio" },
+		}),
+		[],
+	)
+
+	const canAccessPremiumTab = useCallback(
+		(targetTab: Tab) => {
+			return canAccessPremiumFeature(subscriptionEntitlement, premiumTabRequirements[targetTab])
+		},
+		[premiumTabRequirements, subscriptionEntitlement],
+	)
+
 	const switchTab = useCallback(
 		(newTab: Tab) => {
 			// Only check MDM compliance if mdmCompliant is explicitly false (meaning there's an MDM policy and user is non-compliant)
@@ -138,8 +190,24 @@ const App = () => {
 				return
 			}
 
+			const premiumRequirement = premiumTabRequirements[newTab]
+			if (premiumRequirement) {
+				if (shouldAutoStartTrial(subscriptionEntitlement, premiumRequirement)) {
+					vscode.postMessage({ type: "startSubscriptionTrial" })
+				}
+
+				if (!canAccessPremiumTab(newTab)) {
+					setCurrentSection(undefined)
+					setCurrentMarketplaceTab(undefined)
+					setLockedTab(newTab)
+					setTab(newTab)
+					return
+				}
+			}
+
 			setCurrentSection(undefined)
 			setCurrentMarketplaceTab(undefined)
+			setLockedTab(null)
 
 			if (settingsRef.current?.checkUnsaveChanges) {
 				settingsRef.current.checkUnsaveChanges(() => setTab(newTab))
@@ -147,8 +215,14 @@ const App = () => {
 				setTab(newTab)
 			}
 		},
-		[mdmCompliant],
+		[canAccessPremiumTab, mdmCompliant, premiumTabRequirements, subscriptionEntitlement],
 	)
+
+	useEffect(() => {
+		if (lockedTab && canAccessPremiumTab(lockedTab)) {
+			setLockedTab(null)
+		}
+	}, [canAccessPremiumTab, lockedTab])
 
 	const [currentSection, setCurrentSection] = useState<string | undefined>(undefined)
 	const [currentMarketplaceTab, setCurrentMarketplaceTab] = useState<string | undefined>(undefined)
@@ -356,6 +430,16 @@ const App = () => {
 		<WelcomeView />
 	) : (
 		<>
+			{showAccessExpiryBadge ? (
+				<div className="pointer-events-none fixed bottom-3 right-3 z-30">
+					<div className="rounded-lg border border-vscode-panel-border bg-vscode-editor-background/95 px-3 py-2 text-xs shadow-lg backdrop-blur-sm">
+						<div className="font-medium text-vscode-foreground">
+							{subscriptionEntitlement?.tier === "trial" ? "Trial ends" : "Access ends"}
+						</div>
+						<div className="mt-0.5 text-vscode-descriptionForeground">{formattedAccessExpiry}</div>
+					</div>
+				</div>
+			) : null}
 			{tab === "history" && <HistoryView onDone={() => switchTab("chat")} />}
 			{tab === "settings" && (
 				<SettingsView ref={settingsRef} onDone={() => setTab("chat")} targetSection={currentSection} />
@@ -375,19 +459,54 @@ const App = () => {
 					organizations={cloudOrganizations}
 				/>
 			)}
-			{tab === "literature" && <LiteratureView onDone={() => switchTab("researchPipeline")} />}
-			{tab === "readPaper" && (
-				<ReadPaperView onDone={() => switchTab("researchPipeline")} onOpenAnalysisChat={openAgentChat} />
-			)}
-			{tab === "dataStudio" && <DataStudioView onDone={() => switchTab("researchPipeline")} />}
-			{tab === "researchPipeline" && <ResearchPipelineView onOpenBoundChat={openProjectBoundChat} />}
-			{tab === "paperWriting" && (
-				<PaperWritingView
-					onDone={() => switchTab("researchPipeline")}
-					onOpenResearchPipeline={() => switchTab("researchPipeline")}
-					onOpenBoundChat={openProjectBoundChat}
-				/>
-			)}
+			{tab === "readPaper" &&
+				(lockedTab === "readPaper" ? (
+					<PremiumAccessView
+						entitlement={subscriptionEntitlement}
+						featureLabel="Read Paper"
+						minimumTier="plus"
+						onBack={() => switchTab("researchPipeline")}
+					/>
+				) : (
+					<ReadPaperView onDone={() => switchTab("researchPipeline")} />
+				))}
+			{tab === "dataStudio" &&
+				(lockedTab === "dataStudio" ? (
+					<PremiumAccessView
+						entitlement={subscriptionEntitlement}
+						featureLabel="Data Studio"
+						minimumTier="max"
+						onBack={() => switchTab("researchPipeline")}
+					/>
+				) : (
+					<DataStudioView onDone={() => switchTab("researchPipeline")} />
+				))}
+			{tab === "researchPipeline" &&
+				(lockedTab === "researchPipeline" ? (
+					<PremiumAccessView
+						entitlement={subscriptionEntitlement}
+						featureLabel="Research Pipeline"
+						minimumTier="plus"
+						onBack={() => switchTab("chat")}
+					/>
+				) : (
+					<ResearchPipelineView onOpenBoundChat={openProjectBoundChat} />
+				))}
+			{tab === "paperWriting" &&
+				(lockedTab === "paperWriting" ? (
+					<PremiumAccessView
+						entitlement={subscriptionEntitlement}
+						featureLabel="Paper Writing"
+						minimumTier="pro"
+						onBack={() => switchTab("researchPipeline")}
+					/>
+				) : (
+					<PaperWritingView
+						onDone={() => switchTab("researchPipeline")}
+						onOpenResearchPipeline={() => switchTab("researchPipeline")}
+						onOpenBoundChat={openProjectBoundChat}
+					/>
+				))}
 			<ChatView
 				ref={chatViewRef}
 				isHidden={tab !== "chat"}
