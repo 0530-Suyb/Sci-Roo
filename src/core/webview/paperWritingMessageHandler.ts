@@ -1,9 +1,12 @@
 import type { ClineProvider } from "./ClineProvider"
 import type { WebviewMessage } from "@roo-code/types"
+import * as crypto from "crypto"
+import * as fs from "fs/promises"
 import { singleCompletionHandler } from "../../utils/single-completion-handler"
 import type { SectionType } from "@roo-code/types"
 import { runPaperWorkspaceCommand } from "../../services/paper/paperWorkspaceActions"
 import { buildPaperWorkspaceState } from "../../services/paper/paperWorkspaceState"
+import { CitationVerifier } from "../../services/paper/CitationVerifier"
 import type { PaperProject } from "@roo-code/types"
 
 // ─── Legacy handlers (kept for backward compat during transition) ────
@@ -11,15 +14,33 @@ import type { PaperProject } from "@roo-code/types"
 async function refreshPaperWorkspaceState(provider: ClineProvider, project: PaperProject): Promise<void> {
 	const referenceMgr = provider.getReferenceManager()
 	const sectionMgr = provider.getPaperSectionManager()
+	const paperProjectMgr = provider.getPaperProjectManager()
 
-	if (!referenceMgr || !sectionMgr) {
+	if (!referenceMgr || !sectionMgr || !paperProjectMgr) {
 		return
 	}
 
 	const entries = await referenceMgr.listEntries()
 	const uncatalogued = await referenceMgr.scanUncataloguedPdfs()
-	const { cited, missing } = await referenceMgr.scanTexCitations()
+	const { cited, missing, citationPlaceholders } = await referenceMgr.scanTexCitations()
 	const snapshots = await sectionMgr.listSnapshots()
+	const texFilePath = paperProjectMgr.getPrimaryManuscriptAbsolutePath(project)
+	const verifier = new CitationVerifier(project.rootPath)
+	const verificationState =
+		texFilePath && cited.length > 0
+			? await verifier.verifyAllCitations({ texFilePath, referenceEntries: entries })
+			: await verifier.loadStore()
+	const sectionCiteMap = texFilePath ? await verifier.getSectionCiteMap(texFilePath).catch(() => ({})) : {}
+	const citeLineMap = texFilePath
+		? Object.fromEntries(
+				await Promise.all(
+					cited.map(async (citeKey) => [
+						citeKey,
+						await verifier.getCiteLineLocations(texFilePath, citeKey).catch(() => []),
+					]),
+				),
+			)
+		: {}
 	const workspaceState = await buildPaperWorkspaceState(provider, project, {
 		missingCitationKeys: missing,
 		citedKeys: cited,
@@ -36,7 +57,16 @@ async function refreshPaperWorkspaceState(provider: ClineProvider, project: Pape
 	})
 	await provider.postMessageToWebview({
 		type: "paperReferenceState",
-		paperReferenceState: { entries, uncatalogued, cited, missing },
+		paperReferenceState: {
+			entries,
+			uncatalogued,
+			cited,
+			missing,
+			citationPlaceholders,
+			verificationState,
+			sectionCiteMap,
+			citeLineMap,
+		},
 	})
 	await provider.postMessageToWebview({
 		type: "paperSnapshotState",
@@ -61,6 +91,57 @@ export async function handlePaperWritingAction(provider: ClineProvider, message:
 		}
 
 		const currentProject = paperProject.getCurrentProject()
+		const runCitationVerification = async (targetCiteKey?: string) => {
+			if (!currentProject) return
+			const entries = await referenceMgr.listEntries()
+			const { cited, missing, citationPlaceholders } = await referenceMgr.scanTexCitations()
+			const texFilePath = paperProject.getPrimaryManuscriptAbsolutePath(currentProject)
+			if (!texFilePath) {
+				return
+			}
+			const verifier = new CitationVerifier(currentProject.rootPath)
+			let verificationState
+			if (targetCiteKey) {
+				const existingStore = await verifier.loadStoreForManuscript(texFilePath)
+				const updatedEntry = await verifier.verifyCitation(targetCiteKey, {
+					texFilePath,
+					referenceEntries: entries,
+					existingStore,
+				})
+				const texContent = await fs.readFile(texFilePath, "utf-8")
+				const manuscriptHash = crypto.createHash("sha1").update(texContent).digest("hex")
+				verificationState = await verifier.upsertEntry(updatedEntry, {
+					manuscriptPath: texFilePath,
+					manuscriptHash,
+				})
+			} else {
+				verificationState = await verifier.verifyAllCitations({
+					texFilePath,
+					referenceEntries: entries,
+				})
+			}
+			const sectionCiteMap = await verifier.getSectionCiteMap(texFilePath).catch(() => ({}))
+			const citeLineMap = Object.fromEntries(
+				await Promise.all(
+					cited.map(async (citeKey) => [
+						citeKey,
+						await verifier.getCiteLineLocations(texFilePath, citeKey).catch(() => []),
+					]),
+				),
+			)
+			await provider.postMessageToWebview({
+				type: "paperReferenceState",
+				paperReferenceState: {
+					entries,
+					cited,
+					missing,
+					citationPlaceholders,
+					verificationState,
+					sectionCiteMap,
+					citeLineMap,
+				},
+			})
+		}
 		const buildWritingPayload = async (templateId: string, missingCitationKeys: string[] = []) => {
 			const writingState = await sectionMgr.getWritingState(templateId)
 			const wordStatus = await sectionMgr.getSectionWordStatus(templateId)
@@ -88,7 +169,7 @@ export async function handlePaperWritingAction(provider: ClineProvider, message:
 				})
 				const entries = await referenceMgr.listEntries()
 				const uncatalogued = await referenceMgr.scanUncataloguedPdfs()
-				const { cited, missing } = await referenceMgr.scanTexCitations()
+				const { cited, missing, citationPlaceholders } = await referenceMgr.scanTexCitations()
 				const workspaceState = await buildPaperWorkspaceState(provider, project, {
 					missingCitationKeys: missing,
 					citedKeys: cited,
@@ -99,7 +180,7 @@ export async function handlePaperWritingAction(provider: ClineProvider, message:
 				})
 				await provider.postMessageToWebview({
 					type: "paperReferenceState",
-					paperReferenceState: { entries, uncatalogued, cited, missing },
+					paperReferenceState: { entries, uncatalogued, cited, missing, citationPlaceholders },
 				})
 				return
 			}
@@ -112,31 +193,7 @@ export async function handlePaperWritingAction(provider: ClineProvider, message:
 			}
 			case "projectRefresh": {
 				if (!currentProject) return
-				const entries = await referenceMgr.listEntries()
-				const uncatalogued = await referenceMgr.scanUncataloguedPdfs()
-				const { cited, missing } = await referenceMgr.scanTexCitations()
-				const snapshots = await sectionMgr.listSnapshots()
-				const workspaceState = await buildPaperWorkspaceState(provider, currentProject, {
-					missingCitationKeys: missing,
-					citedKeys: cited,
-				})
-				await provider.postMessageToWebview({
-					type: "paperProjectState",
-					paperProjectState: {
-						project: currentProject,
-						referenceEntries: entries,
-						uncatalogued,
-						workspaceState,
-					},
-				})
-				await provider.postMessageToWebview({
-					type: "paperReferenceState",
-					paperReferenceState: { entries, uncatalogued, cited, missing },
-				})
-				await provider.postMessageToWebview({
-					type: "paperSnapshotState",
-					paperSnapshotState: { snapshots },
-				})
+				await refreshPaperWorkspaceState(provider, currentProject)
 				return
 			}
 			case "projectStageUpdate": {
@@ -411,11 +468,42 @@ export async function handlePaperWritingAction(provider: ClineProvider, message:
 				return
 			}
 			case "referenceScanTex": {
-				const { cited, missing } = await referenceMgr.scanTexCitations()
+				const { cited, missing, citationPlaceholders } = await referenceMgr.scanTexCitations()
 				const entries = await referenceMgr.listEntries()
+				const texFilePath = currentProject
+					? paperProject.getPrimaryManuscriptAbsolutePath(currentProject)
+					: undefined
+				const verifier = currentProject ? new CitationVerifier(currentProject.rootPath) : undefined
+				const verificationState =
+					verifier && texFilePath
+						? await verifier.loadStoreForManuscript(texFilePath).catch(() => undefined)
+						: undefined
+				const sectionCiteMap =
+					verifier && texFilePath
+						? await verifier.getSectionCiteMap(texFilePath).catch(() => ({}))
+						: undefined
+				const citeLineMap =
+					verifier && texFilePath
+						? Object.fromEntries(
+								await Promise.all(
+									cited.map(async (citeKey) => [
+										citeKey,
+										await verifier.getCiteLineLocations(texFilePath, citeKey).catch(() => []),
+									]),
+								),
+							)
+						: undefined
 				await provider.postMessageToWebview({
 					type: "paperReferenceState",
-					paperReferenceState: { cited, missing, entries },
+					paperReferenceState: {
+						cited,
+						missing,
+						citationPlaceholders,
+						entries,
+						verificationState,
+						sectionCiteMap,
+						citeLineMap,
+					},
 				})
 				const workspaceState = await buildPaperWorkspaceState(provider, currentProject, {
 					missingCitationKeys: missing,
@@ -430,6 +518,22 @@ export async function handlePaperWritingAction(provider: ClineProvider, message:
 						},
 					})
 				}
+				return
+			}
+			case "citationVerify": {
+				await runCitationVerification(message.query as string | undefined)
+				return
+			}
+			case "dismissCitationIssue": {
+				if (!currentProject) return
+				const citeKey = message.query as string | undefined
+				if (!citeKey) return
+				const verifier = new CitationVerifier(currentProject.rootPath)
+				const verificationState = await verifier.dismissIssue(citeKey)
+				await provider.postMessageToWebview({
+					type: "paperReferenceState",
+					paperReferenceState: { verificationState },
+				})
 				return
 			}
 			case "referenceGenerateBib": {
@@ -570,39 +674,7 @@ export async function handlePaperWritingList(provider: ClineProvider): Promise<v
 
 		const project = paperProject.getCurrentProject()
 		if (project) {
-			const sectionMgr = provider.getPaperSectionManager()
-			const referenceMgr = provider.getReferenceManager()
-			const entries = referenceMgr ? await referenceMgr.listEntries() : []
-			const uncatalogued = referenceMgr ? await referenceMgr.scanUncataloguedPdfs() : []
-			const citationStatus = referenceMgr ? await referenceMgr.scanTexCitations() : { cited: [], missing: [] }
-			const snapshots = sectionMgr ? await sectionMgr.listSnapshots() : []
-			const workspaceState = await buildPaperWorkspaceState(provider, project, {
-				missingCitationKeys: citationStatus.missing,
-				citedKeys: citationStatus.cited,
-			})
-
-			await provider.postMessageToWebview({
-				type: "paperProjectState",
-				paperProjectState: {
-					project,
-					referenceEntries: entries,
-					uncatalogued,
-					workspaceState,
-				},
-			})
-			await provider.postMessageToWebview({
-				type: "paperReferenceState",
-				paperReferenceState: {
-					entries,
-					uncatalogued,
-					cited: citationStatus.cited,
-					missing: citationStatus.missing,
-				},
-			})
-			await provider.postMessageToWebview({
-				type: "paperSnapshotState",
-				paperSnapshotState: { snapshots },
-			})
+			await refreshPaperWorkspaceState(provider, project)
 		} else {
 			await provider.postMessageToWebview({
 				type: "paperProjectState",

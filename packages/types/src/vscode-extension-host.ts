@@ -16,12 +16,14 @@ import {
 import type { TodoItem } from "./todo.js"
 import type { ReadPaperRetrievalState, ReadPaperWorkspaceConfig } from "./readpaper.js"
 import type { CloudUserInfo, CloudOrganizationMembership, OrganizationAllowList, ShareVisibility } from "./cloud.js"
+import type { SubscriptionEntitlement, SubscriptionTier } from "./billing.js"
 import type { SerializedCustomToolDefinition } from "./custom-tool.js"
 import type { GitCommit } from "./git.js"
 import type { McpServer } from "./mcp.js"
 import type { ModelRecord, RouterModels } from "./model.js"
 import type { OpenAiCodexRateLimitInfo } from "./providers/openai-codex-rate-limits.js"
 import type { SkillMetadata } from "./skills.js"
+import type { PaperProjectViewState, PaperReferenceViewState, PaperSnapshotViewState } from "./research.js"
 import type { WorktreeIncludeStatus } from "./worktree.js"
 
 /**
@@ -207,12 +209,9 @@ export interface ExtensionMessage {
 	researchPipelineState?: any // For research pipeline state response
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	paperWritingState?: any // For paper writing state response
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	paperProjectState?: any // For paper project state response
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	paperReferenceState?: any // For paper reference state response
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	paperSnapshotState?: any // For paper snapshot state response
+	paperProjectState?: PaperProjectViewState // For paper project state response
+	paperReferenceState?: PaperReferenceViewState // For paper reference state response
+	paperSnapshotState?: PaperSnapshotViewState // For paper snapshot state response
 	modes?: { slug: string; name: string }[] // For modes response
 	aggregatedCosts?: {
 		// For taskWithAggregatedCosts response
@@ -386,6 +385,7 @@ export type ExtensionState = Pick<
 	cloudAuthSkipModel?: boolean // Flag indicating auth completed without model selection (user should pick 3rd-party provider)
 	cloudApiUrl?: string
 	cloudOrganizations?: CloudOrganizationMembership[]
+	subscriptionEntitlement?: SubscriptionEntitlement
 	sharingEnabled: boolean
 	publicSharingEnabled: boolean
 	organizationAllowList: OrganizationAllowList
@@ -596,6 +596,12 @@ export interface WebviewMessage {
 		| "refreshCustomTools"
 		| "requestModes"
 		| "switchMode"
+		| "enterActivationCode"
+		| "clearActivationCode"
+		| "refreshSubscriptionEntitlement"
+		| "startSubscriptionTrial"
+		| "openBillingCheckout"
+		| "openBillingPortal"
 		| "debugSetting"
 		// Worktree messages
 		| "listWorktrees"
@@ -735,6 +741,7 @@ export interface WebviewMessage {
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	settings?: any
 	url?: string // For openExternal
+	tier?: SubscriptionTier // For billing checkout
 	mpItem?: MarketplaceItem
 	mpInstallOptions?: InstallMarketplaceItemOptions
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any

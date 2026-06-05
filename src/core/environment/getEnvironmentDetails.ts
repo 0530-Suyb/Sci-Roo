@@ -241,18 +241,27 @@ export async function getEnvironmentDetails(cline: Task, includeFileDetails: boo
 			if (maxFiles === 0) {
 				details += "(Workspace files context disabled. Use list_files to explore if needed.)"
 			} else {
-				const [files, didHitLimit] = await listFiles(cline.cwd, true, maxFiles)
-				const { showRooIgnoredFiles = false } = state ?? {}
+				try {
+					const [files, didHitLimit] = await listFiles(cline.cwd, true, maxFiles)
+					const { showRooIgnoredFiles = false } = state ?? {}
 
-				const result = formatResponse.formatFilesList(
-					cline.cwd,
-					files,
-					didHitLimit,
-					cline.rooIgnoreController,
-					showRooIgnoredFiles,
-				)
+					const result = formatResponse.formatFilesList(
+						cline.cwd,
+						files,
+						didHitLimit,
+						cline.rooIgnoreController,
+						showRooIgnoredFiles,
+					)
 
-				details += result
+					details += result
+				} catch (error) {
+					console.warn(
+						`[getEnvironmentDetails] Failed to collect workspace files for ${cline.cwd}: ${
+							error instanceof Error ? error.message : String(error)
+						}`,
+					)
+					details += "(Workspace files unavailable. Use list_files to explore if needed.)"
+				}
 			}
 		}
 	}

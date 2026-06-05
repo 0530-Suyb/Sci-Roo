@@ -208,8 +208,8 @@ export function countLatexWords(text: string): number {
 	return stripped ? stripped.split(/\s+/).length : 0
 }
 
-function countCitationPlaceholders(text: string): number {
-	return (text.match(/\[CITATION NEEDED\]/g) ?? []).length
+export function countCitationPlaceholders(text: string): number {
+	return (text.match(/\[CITATION NEEDED(?::[^\]]+)?\]/g) ?? []).length
 }
 
 async function fileExists(targetPath: string): Promise<boolean> {

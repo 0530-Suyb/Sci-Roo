@@ -3,7 +3,7 @@
 	"displayName": "%extension.displayName%",
 	"description": "%extension.description%",
 	"publisher": "suyb",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"icon": "assets/icons/icon.png",
 	"galleryBanner": {
 		"color": "#617A91",
@@ -86,11 +86,6 @@
 				"icon": "$(extensions)"
 			},
 			{
-				"command": "sci-roo.literatureButtonClicked",
-				"title": "%command.literature.title%",
-				"icon": "$(library)"
-			},
-			{
 				"command": "sci-roo.readPaperButtonClicked",
 				"title": "%command.readPaper.title%",
 				"icon": "$(book)"
@@ -109,6 +104,11 @@
 				"command": "sci-roo.paperWritingButtonClicked",
 				"title": "%command.paperWriting.title%",
 				"icon": "$(file-text)"
+			},
+			{
+				"command": "sci-roo.paperWritingQuickActions",
+				"title": "%command.paperWritingQuickActions.title%",
+				"category": "Paper Writing"
 			},
 			{
 				"command": "sci-roo.paperRewriteSelection",
@@ -219,6 +219,26 @@
 				"command": "sci-roo.paperOpenSourceControl",
 				"title": "%command.paperOpenSourceControl.title%",
 				"category": "Paper Writing"
+			},
+			{
+				"command": "sci-roo.enterActivationCode",
+				"title": "%command.enterActivationCode.title%",
+				"category": "%configuration.title%"
+			},
+			{
+				"command": "sci-roo.clearActivationCode",
+				"title": "%command.clearActivationCode.title%",
+				"category": "%configuration.title%"
+			},
+			{
+				"command": "sci-roo.resetSubscriptionTrial",
+				"title": "%command.resetSubscriptionTrial.title%",
+				"category": "%configuration.title%"
+			},
+			{
+				"command": "sci-roo.refreshSubscriptionEntitlement",
+				"title": "%command.refreshSubscriptionEntitlement.title%",
+				"category": "%configuration.title%"
 			},
 			{
 				"command": "sci-roo.popoutButtonClicked",
@@ -449,23 +469,18 @@
 					"when": "view == sci-roo.SidebarProvider"
 				},
 				{
-					"command": "sci-roo.literatureButtonClicked",
+					"command": "sci-roo.readPaperButtonClicked",
 					"group": "navigation@3",
 					"when": "view == sci-roo.SidebarProvider"
 				},
 				{
-					"command": "sci-roo.readPaperButtonClicked",
+					"command": "sci-roo.dataStudioButtonClicked",
 					"group": "navigation@4",
 					"when": "view == sci-roo.SidebarProvider"
 				},
 				{
-					"command": "sci-roo.dataStudioButtonClicked",
-					"group": "navigation@5",
-					"when": "view == sci-roo.SidebarProvider"
-				},
-				{
 					"command": "sci-roo.paperWritingButtonClicked",
-					"group": "navigation@6",
+					"group": "navigation@5",
 					"when": "view == sci-roo.SidebarProvider"
 				},
 				{
@@ -506,23 +521,18 @@
 					"when": "activeWebviewPanelId == sci-roo.TabPanelProvider"
 				},
 				{
-					"command": "sci-roo.literatureButtonClicked",
+					"command": "sci-roo.readPaperButtonClicked",
 					"group": "navigation@3",
 					"when": "activeWebviewPanelId == sci-roo.TabPanelProvider"
 				},
 				{
-					"command": "sci-roo.readPaperButtonClicked",
+					"command": "sci-roo.dataStudioButtonClicked",
 					"group": "navigation@4",
 					"when": "activeWebviewPanelId == sci-roo.TabPanelProvider"
 				},
 				{
-					"command": "sci-roo.dataStudioButtonClicked",
-					"group": "navigation@5",
-					"when": "activeWebviewPanelId == sci-roo.TabPanelProvider"
-				},
-				{
 					"command": "sci-roo.paperWritingButtonClicked",
-					"group": "navigation@6",
+					"group": "navigation@5",
 					"when": "activeWebviewPanelId == sci-roo.TabPanelProvider"
 				},
 				{

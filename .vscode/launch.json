@@ -13,7 +13,7 @@
 			"args": ["--extensionDevelopmentPath=${workspaceFolder}/src"],
 			"sourceMaps": true,
 			"outFiles": ["${workspaceFolder}/src/dist/**/*.js"],
-			"preLaunchTask": "${defaultBuildTask}",
+			"preLaunchTask": "build:extension-dev",
 			"env": {
 				"NODE_ENV": "development",
 				"VSCODE_DEBUG_MODE": "true"
@@ -23,6 +23,28 @@
 				"hidden": false,
 				"group": "tasks",
 				"order": 1
+			}
+		},
+		{
+			"name": "Run Extension with Local Billing Mock",
+			"type": "extensionHost",
+			"request": "launch",
+			"runtimeExecutable": "${execPath}",
+			"args": ["--extensionDevelopmentPath=${workspaceFolder}/src"],
+			"sourceMaps": true,
+			"outFiles": ["${workspaceFolder}/src/dist/**/*.js"],
+			"preLaunchTask": "dev:extension-with-billing-mock",
+			"env": {
+				"NODE_ENV": "development",
+				"VSCODE_DEBUG_MODE": "true",
+				"ROO_CODE_API_URL": "http://localhost:3000",
+				"SCI_ROO_ENABLE_BILLING_MOCK": "true"
+			},
+			"resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"],
+			"presentation": {
+				"hidden": false,
+				"group": "tasks",
+				"order": 2
 			}
 		}
 	]

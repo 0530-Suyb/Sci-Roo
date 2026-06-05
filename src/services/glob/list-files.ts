@@ -43,13 +43,26 @@ export async function listFiles(dirPath: string, recursive: boolean, limit: numb
 		return specialResult
 	}
 
-	// Get ripgrep path
+	const ignoreInstance = await createIgnoreInstance(dirPath)
 	const rgPath = await getRipgrepPath()
+
+	if (!rgPath) {
+		const files = await listFilesWithFileSystem(dirPath, recursive, limit, ignoreInstance)
+		const remainingLimit = Math.max(0, limit - files.length)
+		const directories = await listFilteredDirectories(dirPath, recursive, ignoreInstance, remainingLimit)
+		const [results, limitReached] = formatAndCombineResults(files, directories, limit)
+
+		if (recursive && limitReached) {
+			const firstLevelDirs = await getFirstLevelDirectories(dirPath, ignoreInstance)
+			return ensureFirstLevelDirectoriesIncluded(results, firstLevelDirs, limit)
+		}
+
+		return [results, limitReached]
+	}
 
 	if (!recursive) {
 		// For non-recursive, use the existing approach
 		const files = await listFilesWithRipgrep(rgPath, dirPath, false, limit)
-		const ignoreInstance = await createIgnoreInstance(dirPath)
 		// Calculate remaining limit for directories
 		const remainingLimit = Math.max(0, limit - files.length)
 		const directories = await listFilteredDirectories(dirPath, false, ignoreInstance, remainingLimit)
@@ -58,7 +71,6 @@ export async function listFiles(dirPath: string, recursive: boolean, limit: numb
 
 	// For recursive mode, use the original approach but ensure first-level directories are included
 	const files = await listFilesWithRipgrep(rgPath, dirPath, true, limit)
-	const ignoreInstance = await createIgnoreInstance(dirPath)
 	// Calculate remaining limit for directories
 	const remainingLimit = Math.max(0, limit - files.length)
 	const directories = await listFilteredDirectories(dirPath, true, ignoreInstance, remainingLimit)
@@ -183,15 +195,9 @@ async function handleSpecialDirectories(dirPath: string): Promise<[string[], boo
 /**
  * Get the path to the ripgrep binary
  */
-async function getRipgrepPath(): Promise<string> {
+async function getRipgrepPath(): Promise<string | undefined> {
 	const vscodeAppRoot = vscode.env.appRoot
-	const rgPath = await getBinPath(vscodeAppRoot)
-
-	if (!rgPath) {
-		throw new Error("Could not find ripgrep binary")
-	}
-
-	return rgPath
+	return getBinPath(vscodeAppRoot)
 }
 
 /**
@@ -211,6 +217,93 @@ async function listFilesWithRipgrep(
 	// Resolve dirPath once here for the mapping operation
 	const absolutePath = path.resolve(dirPath)
 	return relativePaths.map((relativePath) => path.resolve(absolutePath, relativePath))
+}
+
+async function listFilesWithFileSystem(
+	dirPath: string,
+	recursive: boolean,
+	limit: number,
+	ignoreInstance: ReturnType<typeof ignore>,
+): Promise<string[]> {
+	const absolutePath = path.resolve(dirPath)
+	const files: string[] = []
+	const isExplicitHiddenTarget = path.basename(absolutePath).startsWith(".")
+	const initialContext: ScanContext = {
+		isTargetDir: isExplicitHiddenTarget,
+		insideExplicitHiddenTarget: isExplicitHiddenTarget,
+		basePath: dirPath,
+		ignoreInstance,
+	}
+
+	async function scanDirectory(currentPath: string, context: ScanContext): Promise<boolean> {
+		try {
+			const entries = await fs.promises.readdir(currentPath, { withFileTypes: true })
+
+			for (const entry of entries) {
+				if (files.length >= limit) {
+					return true
+				}
+
+				const fullPath = path.join(currentPath, entry.name)
+
+				if (entry.isSymbolicLink()) {
+					continue
+				}
+
+				if (entry.isFile() && shouldIncludeFile(fullPath, context)) {
+					files.push(fullPath)
+					continue
+				}
+
+				if (!recursive || !entry.isDirectory()) {
+					continue
+				}
+
+				const dirName = entry.name
+				const isHiddenDir = dirName.startsWith(".")
+				let shouldRecurseIntoDir = true
+
+				if (context.insideExplicitHiddenTarget) {
+					shouldRecurseIntoDir = !CRITICAL_IGNORE_PATTERNS.has(dirName)
+				} else {
+					shouldRecurseIntoDir = !isDirectoryExplicitlyIgnored(dirName)
+				}
+
+				const shouldRecurse =
+					shouldRecurseIntoDir &&
+					!(
+						isHiddenDir &&
+						DIRS_TO_IGNORE.includes(".*") &&
+						!context.isTargetDir &&
+						!context.insideExplicitHiddenTarget
+					)
+
+				if (!shouldRecurse) {
+					continue
+				}
+
+				const newInsideExplicitHiddenTarget =
+					context.insideExplicitHiddenTarget || (isHiddenDir && context.isTargetDir)
+				const newContext: ScanContext = {
+					...context,
+					isTargetDir: false,
+					insideExplicitHiddenTarget: newInsideExplicitHiddenTarget,
+				}
+
+				const limitReached = await scanDirectory(fullPath, newContext)
+				if (limitReached) {
+					return true
+				}
+			}
+		} catch (err) {
+			console.warn(`Could not read directory ${currentPath}: ${err}`)
+		}
+
+		return false
+	}
+
+	await scanDirectory(absolutePath, initialContext)
+	return files
 }
 
 /**
@@ -533,6 +626,11 @@ function isIgnoredByGitignore(
 	const relativePath = path.relative(basePath, fullDirPath)
 	const normalizedPath = relativePath.replace(/\\/g, "/")
 	return ignoreInstance.ignores(normalizedPath) || ignoreInstance.ignores(normalizedPath + "/")
+}
+
+function shouldIncludeFile(fullFilePath: string, context: ScanContext): boolean {
+	const relativePath = path.relative(context.basePath, fullFilePath).replace(/\\/g, "/")
+	return !context.ignoreInstance.ignores(relativePath)
 }
 
 /**

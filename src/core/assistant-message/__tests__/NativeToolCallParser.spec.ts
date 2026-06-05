@@ -291,6 +291,73 @@ describe("NativeToolCallParser", () => {
 				})
 			})
 		})
+
+		describe("literature_library tool", () => {
+			it("should parse minimal list args", () => {
+				const toolCall = {
+					id: "toolu_lit_1",
+					name: "literature_library" as const,
+					arguments: JSON.stringify({
+						action: "list",
+					}),
+				}
+
+				const result = NativeToolCallParser.parseToolCall(toolCall)
+
+				expect(result).not.toBeNull()
+				expect(result?.type).toBe("tool_use")
+				if (result?.type === "tool_use") {
+					const nativeArgs = result.nativeArgs as { action: string }
+					expect(nativeArgs.action).toBe("list")
+				}
+			})
+
+			it("should preserve tags for list filtering", () => {
+				const toolCall = {
+					id: "toolu_lit_2",
+					name: "literature_library" as const,
+					arguments: JSON.stringify({
+						action: "list",
+						query: "",
+						tags: ["survey", "llm"],
+					}),
+				}
+
+				const result = NativeToolCallParser.parseToolCall(toolCall)
+
+				expect(result).not.toBeNull()
+				expect(result?.type).toBe("tool_use")
+				if (result?.type === "tool_use") {
+					const nativeArgs = result.nativeArgs as { action: string; tags?: string[] }
+					expect(nativeArgs.action).toBe("list")
+					expect(nativeArgs.tags).toEqual(["survey", "llm"])
+					expect(result.params.tags).toBe(JSON.stringify(["survey", "llm"]))
+				}
+			})
+
+			it("should ignore empty query and empty tags for list", () => {
+				const toolCall = {
+					id: "toolu_lit_3",
+					name: "literature_library" as const,
+					arguments: JSON.stringify({
+						action: "list",
+						query: "",
+						tags: [],
+					}),
+				}
+
+				const result = NativeToolCallParser.parseToolCall(toolCall)
+
+				expect(result).not.toBeNull()
+				expect(result?.type).toBe("tool_use")
+				if (result?.type === "tool_use") {
+					const nativeArgs = result.nativeArgs as { action: string; query?: string; tags?: string[] }
+					expect(nativeArgs.action).toBe("list")
+					expect(nativeArgs.query).toBeUndefined()
+					expect(nativeArgs.tags).toBeUndefined()
+				}
+			})
+		})
 	})
 
 	describe("processStreamingChunk", () => {

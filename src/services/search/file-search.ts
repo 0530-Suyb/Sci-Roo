@@ -21,7 +21,7 @@ export async function executeRipgrep({
 	const rgPath = await getBinPath(vscode.env.appRoot)
 
 	if (!rgPath) {
-		throw new Error(`ripgrep not found: ${rgPath}`)
+		return executeFileSearchFallback({ args, workspacePath, limit })
 	}
 
 	return new Promise((resolve, reject) => {
@@ -84,6 +84,116 @@ export async function executeRipgrep({
 			reject(new Error(`ripgrep process error: ${error.message}`))
 		})
 	})
+}
+
+async function executeFileSearchFallback({
+	args,
+	workspacePath,
+	limit,
+}: {
+	args: string[]
+	workspacePath: string
+	limit: number
+}): Promise<FileResult[]> {
+	const includePatterns: string[] = []
+	const excludePatterns: string[] = []
+
+	for (let i = 0; i < args.length; i++) {
+		if (args[i] === "-g") {
+			const pattern = args[i + 1]
+			if (!pattern) {
+				continue
+			}
+			if (pattern.startsWith("!")) {
+				excludePatterns.push(pattern.slice(1))
+			} else {
+				includePatterns.push(pattern)
+			}
+			i++
+		}
+	}
+
+	const fileResults: FileResult[] = []
+	const dirSet = new Set<string>()
+
+	async function walk(currentPath: string): Promise<void> {
+		if (fileResults.length >= limit) {
+			return
+		}
+
+		let entries: fs.Dirent[]
+		try {
+			entries = await fs.promises.readdir(currentPath, { withFileTypes: true })
+		} catch {
+			return
+		}
+
+		for (const entry of entries) {
+			if (fileResults.length >= limit) {
+				return
+			}
+
+			if (entry.isSymbolicLink()) {
+				continue
+			}
+
+			const fullPath = path.join(currentPath, entry.name)
+			const relativePath = path.relative(workspacePath, fullPath).replace(/\\/g, "/")
+
+			if (entry.isDirectory()) {
+				if (matchesAnyPattern(relativePath, excludePatterns)) {
+					continue
+				}
+				await walk(fullPath)
+				continue
+			}
+
+			if (!entry.isFile()) {
+				continue
+			}
+
+			if (includePatterns.length > 0 && !matchesAnyPattern(relativePath, includePatterns)) {
+				continue
+			}
+			if (matchesAnyPattern(relativePath, excludePatterns)) {
+				continue
+			}
+
+			fileResults.push({ path: relativePath, type: "file", label: path.basename(relativePath) })
+
+			let dirPath = path.dirname(relativePath)
+			while (dirPath && dirPath !== "." && dirPath !== "/") {
+				dirSet.add(dirPath)
+				dirPath = path.dirname(dirPath)
+			}
+		}
+	}
+
+	await walk(workspacePath)
+
+	return [
+		...fileResults,
+		...Array.from(dirSet).map((dirPath) => ({
+			path: dirPath,
+			type: "folder" as const,
+			label: path.basename(dirPath),
+		})),
+	]
+}
+
+function matchesAnyPattern(relativePath: string, patterns: string[]): boolean {
+	return patterns.some((pattern) => matchesGlobPattern(relativePath, pattern))
+}
+
+function matchesGlobPattern(relativePath: string, pattern: string): boolean {
+	const escaped = pattern
+		.replace(/[.+^${}()|[\]\\]/g, "\\$&")
+		.replace(/\*\*/g, "::DOUBLE_STAR::")
+		.replace(/\*/g, "[^/]*")
+		.replace(/::DOUBLE_STAR::/g, ".*")
+
+	const regex = new RegExp(`^${escaped}$`)
+	return regex.test(relativePath)
 }
 
 /**

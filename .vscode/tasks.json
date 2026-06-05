@@ -4,8 +4,54 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
+			"label": "bundle",
+			"type": "shell",
+			"command": "pnpm --dir src bundle",
+			"options": {
+				"env": {
+					"PATH": "${workspaceFolder}\\.tools\\node-v20.19.2-win-x64;${env:PATH}"
+				}
+			},
+			"group": "build",
+			"presentation": {
+				"group": "watch",
+				"reveal": "always"
+			}
+		},
+		{
+			"label": "build:webview",
+			"type": "shell",
+			"command": "pnpm --filter @roo-code/vscode-webview build",
+			"options": {
+				"env": {
+					"PATH": "${workspaceFolder}\\.tools\\node-v20.19.2-win-x64;${env:PATH}"
+				}
+			},
+			"group": "build",
+			"presentation": {
+				"group": "watch",
+				"reveal": "always"
+			}
+		},
+		{
+			"label": "build:extension-dev",
+			"dependsOn": ["build:webview", "bundle"],
+			"dependsOrder": "sequence",
+			"presentation": {
+				"reveal": "never"
+			}
+		},
+		{
+			"label": "dev:extension-with-billing-mock",
+			"dependsOn": ["build:extension-dev", "dev:billing-mock-site"],
+			"dependsOrder": "sequence",
+			"presentation": {
+				"reveal": "never"
+			}
+		},
+		{
 			"label": "watch",
-			"dependsOn": ["watch:webview", "watch:bundle", "watch:tsc"],
+			"dependsOn": ["watch:webview", "watch:bundle"],
 			"presentation": {
 				"reveal": "never"
 			},
@@ -44,10 +90,11 @@
 		{
 			"label": "watch:bundle",
 			"type": "shell",
-			"command": "npx turbo watch:bundle",
+			"command": "node src/esbuild.mjs --watch",
 			"options": {
+				"cwd": "${workspaceFolder}",
 				"env": {
-					"PATH": "${workspaceFolder}\\.tools\\node-v20.19.2-win-x64;${env:PATH}"
+					"PATH": "D:\\nodejs;${env:PATH}"
 				}
 			},
 			"group": "build",
@@ -63,6 +110,33 @@
 				}
 			},
 			"isBackground": true,
+			"presentation": {
+				"group": "watch",
+				"reveal": "always"
+			}
+		},
+		{
+			"label": "dev:billing-mock-site",
+			"type": "shell",
+			"command": "pnpm --filter @roo-code/web-roo-code dev",
+			"options": {
+				"env": {
+					"SCI_ROO_ENABLE_BILLING_MOCK": "true",
+					"PATH": "${workspaceFolder}\\.tools\\node-v20.19.2-win-x64;${env:PATH}"
+				}
+			},
+			"isBackground": true,
+			"problemMatcher": {
+				"owner": "nextjs",
+				"pattern": {
+					"regexp": "^$"
+				},
+				"background": {
+					"activeOnStart": true,
+					"beginsPattern": ".*next dev.*|.*Starting.*",
+					"endsPattern": ".*Local:.*http://localhost:3000.*"
+				}
+			},
 			"presentation": {
 				"group": "watch",
 				"reveal": "always"

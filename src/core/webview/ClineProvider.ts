@@ -31,6 +31,8 @@ import {
 	type HistoryItem,
 	type CloudUserInfo,
 	type CloudOrganizationMembership,
+	type SubscriptionEntitlement,
+	type SubscriptionTier,
 	type CreateTaskOptions,
 	type TokenUsage,
 	type ToolUsage,
@@ -44,6 +46,7 @@ import {
 	ORGANIZATION_ALLOW_ALL,
 	DEFAULT_MODES,
 	DEFAULT_CHECKPOINT_TIMEOUT_SECONDS,
+	createSubscriptionEntitlement,
 	getModelId,
 	isRetiredProvider,
 } from "@roo-code/types"
@@ -84,6 +87,7 @@ import { PaperProjectManager } from "../../services/paper/PaperProjectManager"
 import { PaperSectionManager } from "../../services/paper/PaperSectionManager"
 import { ReferenceManager } from "../../services/paper/ReferenceManager"
 import { VenueTemplateManager } from "../../services/paper/VenueTemplateManager"
+import { CitationVerifier } from "../../services/paper/CitationVerifier"
 
 import { fileExistsAtPath } from "../../utils/fs"
 import { setTtsEnabled, setTtsSpeed } from "../../utils/tts"
@@ -111,6 +115,13 @@ import { getNonce } from "./getNonce"
 import { getUri } from "./getUri"
 import { REQUESTY_BASE_URL } from "../../shared/utils/requesty"
 import { validateAndFixToolResultIds } from "../task/validateToolResultIds"
+import {
+	createEntitlementFromActivationRecord,
+	createLocalActivationRecord,
+	getTierFromActivationCode,
+	isActivationTierSufficient,
+	type LocalActivationRecord,
+} from "../billing/localActivation"
 
 /**
  * https://github.com/microsoft/vscode-webview-ui-toolkit-samples/blob/main/default/weather-webview/src/providers/WeatherViewProvider.ts
@@ -161,6 +172,7 @@ export class ClineProvider
 	protected venueTemplateManager?: VenueTemplateManager
 	private marketplaceManager: MarketplaceManager
 	private mdmService?: MdmService
+	private deferredServicesInitialization?: Promise<void>
 	private taskCreationCallback: (task: Task) => void
 	private taskEventListeners: WeakMap<Task, Array<() => void>> = new WeakMap()
 	private currentWorkspacePath: string | undefined
@@ -177,6 +189,11 @@ export class ClineProvider
 	private cloudOrganizationsCache: CloudOrganizationMembership[] | null = null
 	private cloudOrganizationsCacheTimestamp: number | null = null
 	private static readonly CLOUD_ORGANIZATIONS_CACHE_DURATION_MS = 5 * 1000 // 5 seconds
+	private subscriptionEntitlementCache: SubscriptionEntitlement = createSubscriptionEntitlement()
+	private subscriptionEntitlementCacheTimestamp: number | null = null
+	private static readonly SUBSCRIPTION_ENTITLEMENT_CACHE_DURATION_MS = 60 * 1000 // 1 minute
+	private static readonly LOCAL_TRIAL_DURATION_MS = 10 * 1000 // 10 seconds for local activation testing
+	private static readonly ENABLE_WEBVIEW_HMR = process.env.SCI_ROO_ENABLE_WEBVIEW_HMR === "true"
 
 	/**
 	 * Monotonically increasing sequence number for clineMessages state pushes.
@@ -232,50 +249,49 @@ export class ClineProvider
 			await this.postStateToWebviewWithoutClineMessages()
 		})
 
-		// Initialize MCP Hub through the singleton manager
-		McpServerManager.getInstance(this.context, this)
-			.then((hub) => {
-				this.mcpHub = hub
-				this.mcpHub.registerClient()
-			})
-			.catch((error) => {
-				this.log(`Failed to initialize MCP Hub: ${error}`)
-			})
-
-		// Initialize Skills Manager for skill discovery
 		this.skillsManager = new SkillsManager(this)
-		this.skillsManager.initialize().catch((error) => {
-			this.log(`Failed to initialize Skills Manager: ${error}`)
-		})
-
-		// Initialize Literature Manager for research paper management
 		this.literatureManager = new LiteratureManager(this)
-		this.literatureManager.initialize().catch((error) => {
-			this.log(`Failed to initialize Literature Manager: ${error}`)
-		})
-
 		this.retrievalManager = new RetrievalManager(this)
-		this.retrievalManager.initialize().catch((error) => {
-			this.log(`Failed to initialize ReadPaper Retrieval Manager: ${error}`)
-		})
-
 		this.dataStudioManager = new DataStudioManager(this)
-		this.dataStudioManager.initialize().catch((error) => {
-			this.log(`Failed to initialize Data Studio Manager: ${error}`)
-		})
-
 		this.researchPipelineManager = new ResearchPipelineManager(this)
-		this.researchPipelineManager.initialize().catch((error) => {
-			this.log(`Failed to initialize Research Pipeline Manager: ${error}`)
-		})
-
 		this.venueTemplateManager = new VenueTemplateManager(this.context.extensionPath)
 		this.paperProjectManager = new PaperProjectManager(this, this.context.extensionPath)
 		this.referenceManager = new ReferenceManager(this)
 		this.paperSectionManager = new PaperSectionManager(this)
 
-		this.paperProjectManager.autoDetect().catch((error) => {
-			this.log(`Failed to auto-detect paper project: ${error}`)
+		this.on(RooCodeEventName.TaskCompleted, async (taskId: string) => {
+			try {
+				const project = this.paperProjectManager?.getCurrentProject()
+				if (!project || project.chatBindings?.paperDraftTaskId !== taskId) {
+					return
+				}
+				const referenceEntries = (await this.referenceManager?.listEntries()) ?? []
+				const texFilePath = this.paperProjectManager?.getPrimaryManuscriptAbsolutePath(project)
+				if (!texFilePath) {
+					return
+				}
+				const verifier = new CitationVerifier(project.rootPath)
+				const verificationState = await verifier.verifyAllCitations({
+					texFilePath,
+					referenceEntries,
+				})
+				const sectionCiteMap = await verifier.getSectionCiteMap(texFilePath).catch(() => ({}))
+				const { cited } = (await this.referenceManager?.scanTexCitations()) ?? { cited: [] }
+				const citeLineMap = Object.fromEntries(
+					await Promise.all(
+						cited.map(async (citeKey) => [
+							citeKey,
+							await verifier.getCiteLineLocations(texFilePath, citeKey).catch(() => []),
+						]),
+					),
+				)
+				await this.postMessageToWebview({
+					type: "paperReferenceState",
+					paperReferenceState: { verificationState, sectionCiteMap, citeLineMap },
+				})
+			} catch (error) {
+				this.log(`Failed to verify citations after paper draft task completion: ${error}`)
+			}
 		})
 
 		this.marketplaceManager = new MarketplaceManager(this.context, this.customModesManager)
@@ -365,15 +381,64 @@ export class ClineProvider
 				() => instance.off(RooCodeEventName.TaskTokenUsageUpdated, onTaskTokenUsageUpdated),
 			])
 		}
+	}
 
-		// Initialize Roo Code Cloud profile sync.
-		if (CloudService.hasInstance()) {
-			this.initializeCloudProfileSync().catch((error) => {
-				this.log(`Failed to initialize cloud profile sync: ${error}`)
-			})
-		} else {
-			this.log("CloudService not ready, deferring cloud profile sync")
+	private ensureDeferredServicesInitialized(): Promise<void> {
+		if (this.deferredServicesInitialization) {
+			return this.deferredServicesInitialization
 		}
+
+		this.deferredServicesInitialization = (async () => {
+			const deferredInitStart = Date.now()
+			this.log("[StartupTrace] deferred:init:start")
+			try {
+				const hub = await McpServerManager.getInstance(this.context, this)
+				this.mcpHub = hub
+				this.mcpHub.registerClient()
+				this.log(`[StartupTrace] deferred:init:mcpHub ${Date.now() - deferredInitStart}ms`)
+			} catch (error) {
+				this.log(`Failed to initialize MCP Hub: ${error}`)
+			}
+
+			this.skillsManager?.initialize().catch((error) => {
+				this.log(`Failed to initialize Skills Manager: ${error}`)
+			})
+			this.log(`[StartupTrace] deferred:init:skillsQueued ${Date.now() - deferredInitStart}ms`)
+
+			this.literatureManager?.initialize().catch((error) => {
+				this.log(`Failed to initialize Literature Manager: ${error}`)
+			})
+			this.log(`[StartupTrace] deferred:init:literatureQueued ${Date.now() - deferredInitStart}ms`)
+
+			this.retrievalManager?.initialize().catch((error) => {
+				this.log(`Failed to initialize ReadPaper Retrieval Manager: ${error}`)
+			})
+			this.log(`[StartupTrace] deferred:init:retrievalQueued ${Date.now() - deferredInitStart}ms`)
+
+			this.dataStudioManager?.initialize().catch((error) => {
+				this.log(`Failed to initialize Data Studio Manager: ${error}`)
+			})
+			this.log(`[StartupTrace] deferred:init:dataStudioQueued ${Date.now() - deferredInitStart}ms`)
+
+			this.researchPipelineManager?.initialize().catch((error) => {
+				this.log(`Failed to initialize Research Pipeline Manager: ${error}`)
+			})
+			this.log(`[StartupTrace] deferred:init:researchPipelineQueued ${Date.now() - deferredInitStart}ms`)
+
+			this.paperProjectManager?.autoDetect().catch((error) => {
+				this.log(`Failed to auto-detect paper project: ${error}`)
+			})
+			this.log(`[StartupTrace] deferred:init:paperAutoDetectQueued ${Date.now() - deferredInitStart}ms`)
+
+			if (this.view) {
+				await this.postStateToWebviewWithoutClineMessages().catch((error) => {
+					this.log(`Failed to post state after deferred initialization: ${error}`)
+				})
+			}
+			this.log(`[StartupTrace] deferred:init:complete ${Date.now() - deferredInitStart}ms`)
+		})()
+
+		return this.deferredServicesInitialization
 	}
 
 	/**
@@ -717,6 +782,8 @@ export class ClineProvider
 		}
 
 		this._disposed = true
+		this.isViewLaunched = false
+		this.deferredServicesInitialization = undefined
 		this.log("Disposing ClineProvider...")
 
 		// Clear all tasks from the stack.
@@ -889,7 +956,10 @@ export class ClineProvider
 	}
 
 	async resolveWebviewView(webviewView: vscode.WebviewView | vscode.WebviewPanel) {
+		const resolveStart = Date.now()
+		this.log("[StartupTrace] resolveWebviewView:start")
 		this.view = webviewView
+		this.isViewLaunched = true
 		const inTabMode = "onDidChangeViewState" in webviewView
 
 		if (inTabMode) {
@@ -940,13 +1010,19 @@ export class ClineProvider
 		}
 
 		webviewView.webview.html =
-			this.contextProxy.extensionMode === vscode.ExtensionMode.Development
+			this.contextProxy.extensionMode === vscode.ExtensionMode.Development && ClineProvider.ENABLE_WEBVIEW_HMR
 				? await this.getHMRHtmlContent(webviewView.webview)
 				: await this.getHtmlContent(webviewView.webview)
+		this.log(`[StartupTrace] resolveWebviewView:htmlReady ${Date.now() - resolveStart}ms`)
 
 		// Sets up an event listener to listen for messages passed from the webview view context
 		// and executes code based on the message that is received.
 		this.setWebviewMessageListener(webviewView.webview)
+		this.log(`[StartupTrace] resolveWebviewView:messageListenerReady ${Date.now() - resolveStart}ms`)
+
+		// Initialize heavier secondary services only after the webview is created,
+		// so extension activation and first paint stay responsive.
+		void this.ensureDeferredServicesInitialized()
 
 		// Initialize code index status subscription for the current workspace.
 		this.updateCodeIndexStatusSubscription()
@@ -1015,6 +1091,8 @@ export class ClineProvider
 		if (!currentTask || currentTask.abandoned || currentTask.abort) {
 			await this.removeClineFromStack()
 		}
+
+		this.log(`[StartupTrace] resolveWebviewView:complete ${Date.now() - resolveStart}ms`)
 	}
 
 	public async createTaskWithHistoryItem(
@@ -2037,6 +2115,46 @@ export class ClineProvider
 		}
 	}
 
+	async postInitialStateToWebview(): Promise<void> {
+		const initialStateStart = Date.now()
+		this.log("[StartupTrace] postInitialState:start")
+		const {
+			apiConfiguration,
+			mode,
+			language,
+			telemetrySetting,
+			cloudUserInfo,
+			cloudIsAuthenticated,
+			sharingEnabled,
+			publicSharingEnabled,
+			organizationAllowList,
+			organizationSettingsVersion,
+		} = await this.getState()
+
+		const currentTask = this.getCurrentTask()
+
+		this.postMessageToWebview({
+			type: "state",
+			state: {
+				version: this.context.extension?.packageJSON?.version ?? "",
+				apiConfiguration,
+				mode: mode ?? defaultModeSlug,
+				language: language ?? formatLanguage(vscode.env.language),
+				renderContext: this.renderContext,
+				cwd: this.cwd,
+				currentTaskId: currentTask?.taskId,
+				cloudUserInfo,
+				cloudIsAuthenticated: cloudIsAuthenticated ?? false,
+				sharingEnabled: sharingEnabled ?? false,
+				publicSharingEnabled: publicSharingEnabled ?? false,
+				organizationAllowList,
+				organizationSettingsVersion,
+				telemetrySetting,
+			},
+		})
+		this.log(`[StartupTrace] postInitialState:complete ${Date.now() - initialStateStart}ms`)
+	}
+
 	/**
 	 * Like postStateToWebview but intentionally omits taskHistory.
 	 *
@@ -2070,14 +2188,175 @@ export class ClineProvider
 	 *   (cloud auth, org settings, profiles, etc.) without interfering with task message streaming.
 	 */
 	async postStateToWebviewWithoutClineMessages(): Promise<void> {
+		const stateStart = Date.now()
 		const state = await this.getStateToPostToWebview()
 		const { clineMessages: _omitMessages, taskHistory: _omitHistory, ...rest } = state
 		this.postMessageToWebview({ type: "state", state: rest })
+		this.log(`[StartupTrace] postStateWithoutClineMessages:complete ${Date.now() - stateStart}ms`)
 
 		// Preserve existing MDM redirect behavior
 		if (this.mdmService?.requiresCloudAuth() && !this.checkMdmCompliance()) {
 			await this.postMessageToWebview({ type: "action", action: "cloudButtonClicked" })
 		}
+	}
+
+	private getLocalTrialFallbackStorageKey(): string {
+		return "subscriptionTrialFallback"
+	}
+
+	private getLocalActivationStorageKey(): string {
+		return "subscriptionActivationRecord"
+	}
+
+	private getStoredLocalActivationRecord(): LocalActivationRecord | undefined {
+		return this.context.globalState.get<LocalActivationRecord>(this.getLocalActivationStorageKey())
+	}
+
+	private getStoredLocalTrialFallback(): SubscriptionEntitlement | undefined {
+		const stored = this.context.globalState.get<SubscriptionEntitlement>(this.getLocalTrialFallbackStorageKey())
+		if (!stored) {
+			return undefined
+		}
+
+		const trialEndsAtMs = stored.trialEndsAt ? Date.parse(stored.trialEndsAt) : Number.NaN
+		if (!Number.isNaN(trialEndsAtMs) && trialEndsAtMs <= Date.now()) {
+			return createSubscriptionEntitlement({
+				tier: "free",
+				status: "expired",
+				trialStartedAt: stored.trialStartedAt,
+				trialEndsAt: stored.trialEndsAt,
+				lastCheckedAt: new Date().toISOString(),
+			})
+		}
+
+		return createSubscriptionEntitlement(stored)
+	}
+
+	private async persistLocalTrialFallback(entitlement: SubscriptionEntitlement | null): Promise<void> {
+		await this.context.globalState.update(this.getLocalTrialFallbackStorageKey(), entitlement ?? undefined)
+	}
+
+	private async persistLocalActivationRecord(record: LocalActivationRecord | null): Promise<void> {
+		await this.context.globalState.update(this.getLocalActivationStorageKey(), record ?? undefined)
+	}
+
+	private setSubscriptionEntitlementCache(entitlement: SubscriptionEntitlement): SubscriptionEntitlement {
+		this.subscriptionEntitlementCache = createSubscriptionEntitlement({
+			...entitlement,
+			lastCheckedAt: entitlement.lastCheckedAt ?? new Date().toISOString(),
+		})
+		this.subscriptionEntitlementCacheTimestamp = Date.now()
+		return this.subscriptionEntitlementCache
+	}
+
+	public async getSubscriptionEntitlement(options?: { force?: boolean }): Promise<SubscriptionEntitlement> {
+		const now = Date.now()
+		if (
+			!options?.force &&
+			this.subscriptionEntitlementCacheTimestamp !== null &&
+			now - this.subscriptionEntitlementCacheTimestamp < ClineProvider.SUBSCRIPTION_ENTITLEMENT_CACHE_DURATION_MS
+		) {
+			return this.subscriptionEntitlementCache
+		}
+
+		const localActivation = this.getStoredLocalActivationRecord()
+		if (localActivation) {
+			return this.setSubscriptionEntitlementCache(createEntitlementFromActivationRecord(localActivation))
+		}
+
+		return this.setSubscriptionEntitlementCache(
+			this.getStoredLocalTrialFallback() ??
+				createSubscriptionEntitlement({
+					lastCheckedAt: new Date().toISOString(),
+				}),
+		)
+	}
+
+	public async startSubscriptionTrial(): Promise<SubscriptionEntitlement> {
+		const localActivation = this.getStoredLocalActivationRecord()
+		if (localActivation) {
+			return this.setSubscriptionEntitlementCache(createEntitlementFromActivationRecord(localActivation))
+		}
+
+		const existingTrial = this.context.globalState.get<SubscriptionEntitlement>(
+			this.getLocalTrialFallbackStorageKey(),
+		)
+		if (existingTrial) {
+			return this.setSubscriptionEntitlementCache(
+				this.getStoredLocalTrialFallback() ??
+					createSubscriptionEntitlement({
+						tier: "free",
+						status: "expired",
+						trialStartedAt: existingTrial.trialStartedAt,
+						trialEndsAt: existingTrial.trialEndsAt,
+						lastCheckedAt: new Date().toISOString(),
+					}),
+			)
+		}
+
+		const now = new Date()
+		const trialEndsAt = new Date(now.getTime() + ClineProvider.LOCAL_TRIAL_DURATION_MS)
+		const localTrial = this.setSubscriptionEntitlementCache(
+			createSubscriptionEntitlement({
+				tier: "trial",
+				status: "trialing",
+				trialStartedAt: now.toISOString(),
+				trialEndsAt: trialEndsAt.toISOString(),
+				lastCheckedAt: now.toISOString(),
+			}),
+		)
+		await this.persistLocalTrialFallback(localTrial)
+		return localTrial
+	}
+
+	public async enterActivationCode(requiredTier?: SubscriptionTier): Promise<SubscriptionEntitlement | null> {
+		const prompt =
+			requiredTier && requiredTier !== "free" && requiredTier !== "trial"
+				? `Enter a ${requiredTier.toUpperCase()} activation code or higher`
+				: "Enter your activation code"
+		const value = await vscode.window.showInputBox({
+			prompt,
+			placeHolder: "PLUS-XXXX-XXXX or SCI-PRO-XXXX-XXXX",
+			ignoreFocusOut: true,
+			password: true,
+		})
+
+		if (!value) {
+			return null
+		}
+
+		const activationRecord = createLocalActivationRecord(value)
+		if (!activationRecord) {
+			await vscode.window.showErrorMessage("The activation code is invalid or not in the local whitelist.")
+			return null
+		}
+
+		if (!isActivationTierSufficient(activationRecord.tier, requiredTier)) {
+			const actualTier = getTierFromActivationCode(value)?.toUpperCase() ?? "UNKNOWN"
+			await vscode.window.showErrorMessage(
+				`This activation code unlocks ${actualTier}, but ${requiredTier?.toUpperCase()} access is required for this feature.`,
+			)
+			return null
+		}
+
+		await this.persistLocalActivationRecord(activationRecord)
+		const entitlement = this.setSubscriptionEntitlementCache(
+			createEntitlementFromActivationRecord(activationRecord),
+		)
+		await vscode.window.showInformationMessage(
+			`${activationRecord.tier.toUpperCase()} access activated on this device.`,
+		)
+		return entitlement
+	}
+
+	public async clearActivationCode(): Promise<SubscriptionEntitlement> {
+		await this.persistLocalActivationRecord(null)
+		return this.getSubscriptionEntitlement({ force: true })
+	}
+
+	public async resetSubscriptionTrial(): Promise<SubscriptionEntitlement> {
+		await this.persistLocalTrialFallback(null)
+		return this.getSubscriptionEntitlement({ force: true })
 	}
 
 	/**
@@ -2290,6 +2569,7 @@ export class ClineProvider
 			// Ignore this error.
 		}
 
+		const subscriptionEntitlement = await this.getSubscriptionEntitlement()
 		const telemetryKey = process.env.POSTHOG_API_KEY
 		const machineId = vscode.env.machineId
 		const mergedAllowedCommands = this.mergeAllowedCommands(allowedCommands)
@@ -2373,6 +2653,7 @@ export class ClineProvider
 			cloudIsAuthenticated: cloudIsAuthenticated ?? false,
 			cloudAuthSkipModel: this.context.globalState.get<boolean>("roo-auth-skip-model") ?? false,
 			cloudOrganizations,
+			subscriptionEntitlement,
 			sharingEnabled: sharingEnabled ?? false,
 			publicSharingEnabled: publicSharingEnabled ?? false,
 			organizationAllowList,
@@ -2438,6 +2719,7 @@ export class ClineProvider
 	> {
 		const stateValues = this.contextProxy.getValues()
 		const customModes = await this.customModesManager.getCustomModes()
+		const subscriptionEntitlement = await this.getSubscriptionEntitlement()
 
 		// Determine apiProvider with the same logic as before, while filtering retired providers.
 		const apiProvider: ProviderName =
@@ -2594,6 +2876,7 @@ export class ClineProvider
 			enterBehavior: stateValues.enterBehavior ?? "send",
 			cloudUserInfo,
 			cloudIsAuthenticated,
+			subscriptionEntitlement,
 			sharingEnabled,
 			publicSharingEnabled,
 			organizationAllowList,

@@ -205,6 +205,15 @@ describe("getEnvironmentDetails", () => {
 		expect(formatResponse.formatFilesList).not.toHaveBeenCalled()
 	})
 
+	it("should gracefully degrade when workspace file listing fails", async () => {
+		;(listFiles as Mock).mockRejectedValue(new Error("Could not find ripgrep binary"))
+
+		const result = await getEnvironmentDetails(mockCline as Task, true)
+
+		expect(result).toContain("Workspace files unavailable")
+		expect(formatResponse.formatFilesList).not.toHaveBeenCalled()
+	})
+
 	it("should include recently modified files if any", async () => {
 		;(mockCline.fileContextTracker!.getAndClearRecentlyModifiedFiles as Mock).mockReturnValue([
 			"modified1.ts",

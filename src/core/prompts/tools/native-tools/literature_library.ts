@@ -5,7 +5,7 @@ export default {
 	function: {
 		name: "literature_library",
 		description:
-			"Manage the local literature library. Use this to add papers to your collection, search your saved papers, export citations in BibTeX format, remove entries, or view library statistics. The library is stored in .roo/literature/library.json.",
+			"Manage the local literature library. Use this to add papers to your collection, search your saved papers, export citations in BibTeX format, remove entries, or view library statistics. The library is stored in .roo/literature/library.json. For listing all entries, call with only {\"action\":\"list\"}. Only include 'query' for the 'search' action, and only include 'tags' when you actually want tag filtering.",
 		strict: true,
 		parameters: {
 			type: "object",
@@ -14,7 +14,7 @@ export default {
 					type: "string",
 					enum: ["add", "remove", "list", "search", "export", "stats"],
 					description:
-						"add: add a paper to the library. remove: delete a paper by entryId. list: list all papers (optionally filtered by tags). search: full-text search across title, authors, abstract, keywords. export: export papers as BibTeX or JSON. stats: get library statistics.",
+						"add: add a paper to the library. remove: delete a paper by entryId. list: list all papers (optionally filtered by tags). search: full-text search across title, authors, abstract, keywords. export: export papers as BibTeX or JSON. stats: get library statistics. When listing everything, use only action=list and omit empty query/tags fields.",
 				},
 				entryId: {
 					type: "string",

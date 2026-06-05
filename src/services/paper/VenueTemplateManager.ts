@@ -1,3 +1,4 @@
+import * as syncFs from "fs"
 import * as fs from "fs/promises"
 import * as path from "path"
 import type { VenueTemplate, SectionConfig, SectionType } from "@roo-code/types"
@@ -13,9 +14,27 @@ export class VenueTemplateManager {
 	private rulesDir: string
 
 	constructor(extensionPath: string) {
-		this.templatesDir = path.join(extensionPath, "services", "paper", "templates")
-		this.skillsDir = path.join(extensionPath, "services", "paper", "skills")
-		this.rulesDir = path.join(extensionPath, "services", "paper", "rules")
+		this.templatesDir = this.resolveResourceDir(extensionPath, "templates")
+		this.skillsDir = this.resolveResourceDir(extensionPath, "skills")
+		this.rulesDir = this.resolveResourceDir(extensionPath, "rules")
+	}
+
+	private resolveResourceDir(extensionPath: string, resourceName: "templates" | "skills" | "rules"): string {
+		const candidates = [
+			path.join(extensionPath, "services", "paper", resourceName),
+			path.join(extensionPath, "dist", "services", "paper", resourceName),
+		]
+
+		for (const candidate of candidates) {
+			try {
+				syncFs.accessSync(candidate)
+				return candidate
+			} catch {
+				// Try the next candidate.
+			}
+		}
+
+		return candidates[0]
 	}
 
 	// ─── Venue Metadata ──────────────────────────────────────────────
@@ -46,7 +65,8 @@ export class VenueTemplateManager {
 	// ─── Template File Operations ────────────────────────────────────
 
 	getTemplateDir(templateId: string): string {
-		return path.join(this.templatesDir, templateId)
+		const venue = getVenueTemplate(templateId)
+		return path.join(this.templatesDir, venue?.templateDirName ?? templateId)
 	}
 
 	async templateExists(templateId: string): Promise<boolean> {
