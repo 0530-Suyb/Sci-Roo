@@ -49,10 +49,31 @@ function normalizeReadPaperAnalysisPdfPaths(paths: unknown): string[] {
 	return result
 }
 
+async function ensureReadPaperAnalysisSkill(provider: ClineProvider, cwd?: string): Promise<void> {
+	if (!cwd?.trim()) return
+
+	const venueTemplateManager = provider.getVenueTemplateManager()
+	if (!venueTemplateManager) return
+
+	try {
+		const copied = await venueTemplateManager.copySkillToProject("paper-analyst", cwd)
+		if (copied) {
+			provider.log(`Provisioned ReadPaper analysis skill to ${path.join(cwd, ".roo", "skills", "paper-analyst")}`)
+		}
+	} catch (error) {
+		provider.log(
+			`Failed to provision ReadPaper analysis skill: ${error instanceof Error ? error.message : String(error)}`,
+		)
+	}
+}
+
 export async function handleReadPaperSelectAnalysisPdfs(
 	provider: ClineProvider,
 	message: WebviewMessage,
 ): Promise<void> {
+	const cwd = typeof message.values?.cwd === "string" ? message.values.cwd : provider.cwd
+	await ensureReadPaperAnalysisSkill(provider, cwd)
+
 	const initialPaths = normalizeReadPaperAnalysisPdfPaths(message.values?.initialPaths)
 
 	if (initialPaths.length > 0) {
@@ -63,7 +84,6 @@ export async function handleReadPaperSelectAnalysisPdfs(
 		return
 	}
 
-	const cwd = typeof message.values?.cwd === "string" ? message.values.cwd : provider.cwd
 	const defaultUri = cwd ? vscode.Uri.file(path.join(cwd, "reference")) : undefined
 	const result = await vscode.window.showOpenDialog({
 		canSelectFiles: true,

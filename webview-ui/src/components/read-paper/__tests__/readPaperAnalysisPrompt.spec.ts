@@ -8,12 +8,13 @@ import {
 } from "../readPaperAnalysisPrompt"
 
 describe("readPaperAnalysisPrompt", () => {
-	it("builds a Chinese paper-analyst prompt for batch PDF analysis", () => {
+	it("builds a paper-analyst prompt for batch PDF analysis", () => {
 		const prompt = buildReadPaperAnalysisPrompt({
 			pdfPaths: ["D:\\papers\\a.pdf", "D:\\papers\\b.pdf"],
 		})
 
-		expect(prompt).toContain("项目本地 skill `.roo/skills/paper-analyst`")
+		expect(prompt).toContain("请使用 `paper-analyst` skill 分析以下 PDF")
+		expect(prompt).toContain("如果当前项目存在 `.roo/skills/paper-analyst`")
 		expect(prompt).toContain("D:\\papers\\a.pdf")
 		expect(prompt).toContain("D:\\papers\\b.pdf")
 		expect(prompt).toContain(`输出目录：\n${DEFAULT_READPAPER_ANALYSIS_OUTPUT_DIR}`)

@@ -33,7 +33,8 @@ export function buildReadPaperAnalysisPrompt(input: ReadPaperAnalysisPromptInput
 	const pdfList = pdfPaths.length > 0 ? pdfPaths.map((path) => `- ${path}`).join("\n") : "- [未选择 PDF]"
 
 	return [
-		"请使用项目本地 skill `.roo/skills/paper-analyst` 分析以下 PDF，并为每篇论文生成 Markdown 文档。",
+		"请使用 `paper-analyst` skill 分析以下 PDF，并为每篇论文生成 Markdown 文档。",
+		"如果当前项目存在 `.roo/skills/paper-analyst`，请优先使用该本地版本；如果不存在，请使用插件自动下发或已安装的同名 skill。",
 		"",
 		"PDF 列表：",
 		pdfList,

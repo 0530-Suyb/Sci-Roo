@@ -288,6 +288,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	abortReason?: ClineApiReqCancelReason
 	isInitialized = false
 	isPaused: boolean = false
+	private taskCompleted = false
 
 	// API
 	apiConfiguration: ProviderSettings
@@ -1554,6 +1555,18 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		return undefined
 	}
 
+	public isNonInteractiveTask(): boolean {
+		return this.taskNonInteractive
+	}
+
+	public markTaskCompleted(): void {
+		this.taskCompleted = true
+	}
+
+	public hasTaskCompleted(): boolean {
+		return this.taskCompleted
+	}
+
 	private mergeTaskAutoApprovalState<T extends object>(state: T | undefined): (T & RooCodeSettings) | undefined {
 		if (!this.taskAutoApprovalOverrides) {
 			return state as (T & RooCodeSettings) | undefined
@@ -2567,7 +2580,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			// requests, but Cline is prompted to finish the task as efficiently
 			// as he can.
 
-			if (didEndLoop) {
+			if (didEndLoop || this.taskCompleted) {
 				// For now a task never 'completes'. This will only happen if
 				// the user hits max requests and denies resetting the count.
 				break

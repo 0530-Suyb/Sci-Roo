@@ -78,6 +78,35 @@ describe("Native Tools Filtering by Mode", () => {
 			expect(codeAllowedTools.has("execute_command")).toBe(true)
 		})
 
+		it("should allow edit tools in sci-lit-review mode", async () => {
+			const literatureMode: ModeConfig = {
+				slug: "sci-lit-review",
+				name: "Literature Review",
+				roleDefinition: "Test literature review",
+				groups: ["read", "edit", "command", "mcp"] as const,
+			}
+
+			const { isToolAllowedForMode } = await import("../../tools/validateToolUse")
+			const { TOOL_GROUPS, ALWAYS_AVAILABLE_TOOLS } = await import("../../../shared/tools")
+
+			const allowedTools = new Set<string>()
+			literatureMode.groups.forEach((groupEntry) => {
+				const groupName = typeof groupEntry === "string" ? groupEntry : groupEntry[0]
+				const toolGroup = TOOL_GROUPS[groupName]
+				if (toolGroup) {
+					toolGroup.tools.forEach((tool) => {
+						if (isToolAllowedForMode(tool as any, "sci-lit-review", [literatureMode])) {
+							allowedTools.add(tool)
+						}
+					})
+				}
+			})
+			ALWAYS_AVAILABLE_TOOLS.forEach((tool) => allowedTools.add(tool))
+
+			expect(allowedTools.has("write_to_file")).toBe(true)
+			expect(allowedTools.has("apply_diff")).toBe(true)
+		})
+
 		it("should filter MCP tools based on use_mcp_tool permission", async () => {
 			const modeWithMcp: ModeConfig = {
 				slug: "test-mode-with-mcp",

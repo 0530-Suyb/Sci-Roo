@@ -78,7 +78,7 @@ export class AttemptCompletionTool extends BaseTool<"attempt_completion"> {
 
 			task.consecutiveMistakeCount = 0
 
-			await task.say("completion_result", result, undefined, false)
+			await this.sayCompletionResultOnce(task, result)
 
 			// Check for subtask using parentTaskId (metadata-driven delegation)
 			if (task.parentTaskId) {
@@ -127,6 +127,11 @@ export class AttemptCompletionTool extends BaseTool<"attempt_completion"> {
 						// Fall through to normal completion ask flow
 					}
 				}
+			}
+
+			if (task.isNonInteractiveTask()) {
+				this.emitTaskCompleted(task)
+				return
 			}
 
 			const { response, text, images } = await task.ask("completion_result", "", false)
@@ -197,12 +202,30 @@ export class AttemptCompletionTool extends BaseTool<"attempt_completion"> {
 	}
 
 	private emitTaskCompleted(task: Task): void {
+		task.markTaskCompleted()
+
 		// Force final token usage update before emitting TaskCompleted.
 		// This ensures the latest stats are captured regardless of throttle timer.
 		task.emitFinalTokenUsageUpdate()
 
 		TelemetryService.instance.captureTaskCompleted(task.taskId)
 		task.emit(RooCodeEventName.TaskCompleted, task.taskId, task.getTokenUsage(), task.toolUsage)
+	}
+
+	private async sayCompletionResultOnce(task: Task, result: string): Promise<void> {
+		const lastMessage = task.clineMessages.at(-1)
+		const lastText = typeof lastMessage?.text === "string" ? lastMessage.text : ""
+
+		if (
+			lastMessage?.type === "say" &&
+			lastMessage.say === "completion_result" &&
+			lastMessage.partial !== true &&
+			lastText === result
+		) {
+			return
+		}
+
+		await task.say("completion_result", result, undefined, false)
 	}
 }
 

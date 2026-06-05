@@ -232,7 +232,7 @@ export const DEFAULT_MODES: readonly ModeConfig[] = [
 		whenToUse:
 			"Use this mode when you need to search for papers, conduct a literature review, evaluate the state of the art on a research question, identify gaps in existing knowledge, or organize a reading list for a project.",
 		description: "Search, evaluate, and synthesize academic literature",
-		groups: ["read", "command", "mcp"],
+		groups: ["read", "edit", "command", "mcp"],
 		customInstructions:
 			"1. Before searching, clarify the research question, inclusion/exclusion criteria, and desired scope.\n2. Search across multiple databases (via MCP tools) and document the search strategy (terms, filters, date range).\n3. Deduplicate results and rank by relevance to the research question.\n4. For each key paper, extract: research question, methodology, key findings, sample size, limitations.\n5. Organize findings thematically and identify consensus vs. controversy in the literature.\n6. Flag research gaps and suggest directions for further investigation.\n7. Format all citations in the user's preferred style (BibTeX, APA, Vancouver, etc.).\n8. If conducting a systematic review, follow PRISMA guidelines and generate a flow diagram.\n\n**CRITICAL: Always cite sources with DOIs. Never fabricate references.**",
 	},

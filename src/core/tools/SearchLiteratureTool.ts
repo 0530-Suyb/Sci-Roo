@@ -52,6 +52,8 @@ const NCBI_TOOL = "Sci-Roo"
 const NCBI_EMAIL = "sci-roo@example.com"
 const OPENALEX_EMAIL = "sci-roo@example.com"
 const FETCH_RETRY_ATTEMPTS = 3
+const SEARCH_SOURCE_TIMEOUT_MS = 30_000
+const ARXIV_SEARCH_SOURCE_TIMEOUT_MS = 60_000
 export const SEARCH_LITERATURE_SOURCE_REGISTRY_VERSION = "1.2"
 const SEARCH_SOURCE_REGISTRY: Record<
 	SearchSource,
@@ -156,12 +158,17 @@ async function searchSource(
 	maxResults: number,
 ): Promise<SourceSearchResult> {
 	try {
-		return await SEARCH_SOURCE_REGISTRY[source](
-			{
-				...params,
-				query: buildSourceQuery(source, params.query),
-			},
-			maxResults,
+		const timeoutMs = source === "arxiv" ? ARXIV_SEARCH_SOURCE_TIMEOUT_MS : SEARCH_SOURCE_TIMEOUT_MS
+		return await withTimeout(
+			SEARCH_SOURCE_REGISTRY[source](
+				{
+					...params,
+					query: buildSourceQuery(source, params.query),
+				},
+				maxResults,
+			),
+			timeoutMs,
+			`${source} search timed out after ${Math.round(timeoutMs / 1000)}s`,
 		)
 	} catch (error) {
 		return {
@@ -240,17 +247,66 @@ async function searchPubMed(params: SearchLiteratureParams, maxResults: number):
 
 async function searchArxiv(params: SearchLiteratureParams, maxResults: number): Promise<SourceSearchResult> {
 	const query = buildArxivQuery(params)
-	const url = new URL("https://export.arxiv.org/api/query")
-	url.searchParams.set("search_query", query)
-	url.searchParams.set("start", "0")
-	url.searchParams.set("max_results", String(maxResults))
-	url.searchParams.set("sortBy", "relevance")
-	url.searchParams.set("sortOrder", "descending")
+	try {
+		const url = new URL("https://export.arxiv.org/api/query")
+		url.searchParams.set("search_query", query)
+		url.searchParams.set("start", "0")
+		url.searchParams.set("max_results", String(maxResults))
+		url.searchParams.set("sortBy", "relevance")
+		url.searchParams.set("sortOrder", "descending")
 
-	const xml = await fetchText(url)
-	const parsed = xmlParser.parse(xml)
-	const entries = asArray(parsed?.feed?.entry)
-	const candidates = entries.map((entry, index) => arxivEntryToCandidate(entry, index + 1))
+		const xml = await fetchText(url)
+		const parsed = xmlParser.parse(xml)
+		const entries = asArray(parsed?.feed?.entry)
+		const candidates = entries.map((entry, index) => arxivEntryToCandidate(entry, index + 1))
+
+		return {
+			run: {
+				source: "arxiv",
+				query,
+				requested_max_results: maxResults,
+				returned_count: candidates.length,
+				status: candidates.length > 0 ? "success" : "no_results",
+				error: candidates.length > 0 ? null : "No arXiv records returned.",
+			},
+			candidates,
+		}
+	} catch (error) {
+		const fallback = await searchArxivViaOpenAlex(params, maxResults)
+		if (fallback.candidates.length > 0) {
+			return {
+				run: {
+					...fallback.run,
+					source: "arxiv",
+					query,
+					status: "partial",
+					error: `arXiv API unavailable; used OpenAlex fallback. ${
+						error instanceof Error ? error.message : String(error)
+					}`,
+				},
+				candidates: fallback.candidates,
+			}
+		}
+		throw error
+	}
+}
+
+async function searchArxivViaOpenAlex(params: SearchLiteratureParams, maxResults: number): Promise<SourceSearchResult> {
+	const query = params.query.trim()
+	const url = new URL("https://api.openalex.org/works")
+	url.searchParams.set("search", query)
+	url.searchParams.set("per-page", String(Math.min(Math.max(maxResults * 3, maxResults), 50)))
+	url.searchParams.set("mailto", OPENALEX_EMAIL)
+	if (params.yearFrom || params.yearTo) {
+		url.searchParams.set("filter", buildOpenAlexYearFilter(params.yearFrom, params.yearTo))
+	}
+
+	const response = await fetchJson(url)
+	const works: unknown[] = Array.isArray(response?.results) ? response.results : []
+	const candidates = works
+		.map((work, index) => openAlexWorkToArxivCandidate(work, index + 1))
+		.filter((candidate): candidate is LiteratureCandidate => candidate !== null)
+		.slice(0, maxResults)
 
 	return {
 		run: {
@@ -258,8 +314,11 @@ async function searchArxiv(params: SearchLiteratureParams, maxResults: number): 
 			query,
 			requested_max_results: maxResults,
 			returned_count: candidates.length,
-			status: candidates.length > 0 ? "success" : "no_results",
-			error: candidates.length > 0 ? null : "No arXiv records returned.",
+			status: candidates.length > 0 ? "partial" : "no_results",
+			error:
+				candidates.length > 0
+					? "Used OpenAlex fallback for arXiv results."
+					: "No arXiv-compatible OpenAlex records returned.",
 		},
 		candidates,
 	}
@@ -703,6 +762,21 @@ function openAlexWorkToCandidate(work: any, sourceRank: number): LiteratureCandi
 	}
 }
 
+function openAlexWorkToArxivCandidate(work: any, sourceRank: number): LiteratureCandidate | null {
+	const candidate = openAlexWorkToCandidate(work, sourceRank)
+	if (!candidate.arxiv_id) {
+		return null
+	}
+
+	return {
+		...candidate,
+		source: "arxiv",
+		source_id: candidate.arxiv_id,
+		venue: "arXiv",
+		url: buildIdentifierUrl({ arxivId: candidate.arxiv_id }) || candidate.url,
+	}
+}
+
 async function fetchJson(url: URL, headers?: Record<string, string>): Promise<any> {
 	const response = await fetchWithRetry(url, headers)
 	return response.json()
@@ -734,6 +808,9 @@ async function fetchWithRetry(url: URL, headers?: Record<string, string>): Promi
 		}
 
 		const body = await safeResponseText(response)
+		if (response.status === 429 && response.url.includes("export.arxiv.org")) {
+			throw new Error(formatHttpError(url, response.status, body))
+		}
 		if (!isRetryableStatus(response.status) || attempt === FETCH_RETRY_ATTEMPTS - 1) {
 			throw new Error(formatHttpError(url, response.status, body))
 		}
@@ -788,6 +865,23 @@ function parseRetryAfterMs(value: string | null | undefined): number | undefined
 
 function sleep(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+	let timeoutId: ReturnType<typeof setTimeout> | undefined
+
+	try {
+		return await Promise.race([
+			promise,
+			new Promise<T>((_, reject) => {
+				timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs)
+			}),
+		])
+	} finally {
+		if (timeoutId) {
+			clearTimeout(timeoutId)
+		}
+	}
 }
 
 function getSemanticScholarHeaders(): Record<string, string> | undefined {
@@ -1128,7 +1222,7 @@ function openAlexInvertedIndexToText(value: unknown): string {
 
 function findArxivId(...values: string[]): string {
 	for (const value of values) {
-		const match = value.match(/arxiv(?:\.|:|\/abs\/|\/pdf\/)(\d{4}\.\d{4,5}(?:v\d+)?)/i)
+		const match = value.match(/arxiv(?:\.org)?(?:\/(?:abs|pdf)\/|:|\.)(\d{4}\.\d{4,5}(?:v\d+)?)/i)
 		if (match?.[1]) return match[1].replace(/\.pdf$/i, "")
 	}
 	return ""

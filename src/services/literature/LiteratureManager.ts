@@ -22,6 +22,10 @@ function generateId(): string {
 }
 
 type DuplicateComparableEntry = Pick<LiteratureEntry, "doi" | "pmid" | "arxivId" | "title">
+type ReadPaperIdentity = {
+	candidateTag?: string
+	sourceTag?: string
+}
 
 export class LiteratureManager {
 	private library: LiteratureLibrary = { entries: [], version: LITERATURE_LIBRARY_VERSION, lastModified: "" }
@@ -172,9 +176,9 @@ export class LiteratureManager {
 		options?: { retrievalNo?: string },
 	): LiteratureEntry | undefined {
 		const mapped = this.mapReadPaperCandidate(candidate, options)
-		const retrievalTag = options?.retrievalNo ? `readpaper:${options.retrievalNo}` : undefined
+		const identity = this.getReadPaperIdentityTags(candidate, options)
 		return this.library.entries.find((entry) => {
-			if (retrievalTag && entry.tags.includes(retrievalTag)) return true
+			if (this.matchesReadPaperIdentity(entry, identity)) return true
 			return this.findDuplicateReason(entry, mapped) !== null
 		})
 	}
@@ -236,12 +240,12 @@ export class LiteratureManager {
 		options?: { retrievalNo?: string },
 	): Promise<{ deleted: number; entryIds: string[] }> {
 		const matchedEntryIds = new Set<string>()
-		const retrievalTag = options?.retrievalNo ? `readpaper:${options.retrievalNo}` : undefined
 
 		for (const candidate of candidates) {
 			const mapped = this.mapReadPaperCandidate(candidate, options)
+			const identity = this.getReadPaperIdentityTags(candidate, options)
 			for (const entry of this.library.entries) {
-				if (retrievalTag && entry.tags.includes(retrievalTag)) {
+				if (this.matchesReadPaperIdentity(entry, identity)) {
 					matchedEntryIds.add(entry.id)
 					continue
 				}
@@ -356,10 +360,12 @@ export class LiteratureManager {
 		candidate: RetrievalCandidate,
 		options?: { retrievalNo?: string },
 	): Omit<LiteratureEntry, "id" | "dateAdded" | "dateModified"> {
+		const identity = this.getReadPaperIdentityTags(candidate, options)
 		const tags = [
 			"readpaper",
 			options?.retrievalNo ? `readpaper:${options.retrievalNo}` : "",
-			candidate.source_id ? `source-id:${candidate.source}:${candidate.source_id}` : "",
+			identity.sourceTag ?? "",
+			identity.candidateTag ?? "",
 		].filter(Boolean)
 
 		return {
@@ -424,6 +430,25 @@ export class LiteratureManager {
 			if (w.length > 2 && longer.includes(w)) matches++
 		}
 		return matches / words.length
+	}
+
+	private getReadPaperIdentityTags(
+		candidate: Pick<RetrievalCandidate, "candidate_no" | "source" | "source_id">,
+		options?: { retrievalNo?: string },
+	): ReadPaperIdentity {
+		return {
+			candidateTag:
+				options?.retrievalNo && candidate.candidate_no
+					? `readpaper-candidate:${options.retrievalNo}:${candidate.candidate_no}`
+					: undefined,
+			sourceTag: candidate.source_id ? `source-id:${candidate.source}:${candidate.source_id}` : undefined,
+		}
+	}
+
+	private matchesReadPaperIdentity(entry: LiteratureEntry, identity: ReadPaperIdentity): boolean {
+		if (identity.candidateTag && entry.tags.includes(identity.candidateTag)) return true
+		if (identity.sourceTag && entry.tags.includes(identity.sourceTag)) return true
+		return false
 	}
 
 	// ---- Import / Export ----

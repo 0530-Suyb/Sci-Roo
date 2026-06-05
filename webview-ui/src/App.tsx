@@ -6,7 +6,7 @@ import {
 	type ExtensionMessage,
 	type SubscriptionCapabilityKey,
 	type SubscriptionTier,
-  type RooCodeSettings,
+	type RooCodeSettings,
 	TelemetryEventName,
 } from "@roo-code/types"
 
@@ -468,7 +468,7 @@ const App = () => {
 						onBack={() => switchTab("researchPipeline")}
 					/>
 				) : (
-					<ReadPaperView onDone={() => switchTab("researchPipeline")} />
+					<ReadPaperView onDone={() => switchTab("researchPipeline")} onOpenAnalysisChat={openAgentChat} />
 				))}
 			{tab === "dataStudio" &&
 				(lockedTab === "dataStudio" ? (

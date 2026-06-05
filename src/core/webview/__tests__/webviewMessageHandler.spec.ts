@@ -81,6 +81,7 @@ const mockClineProvider = {
 	createTask: vi.fn(),
 	createTaskWithHistoryItem: vi.fn(),
 	getSkillsManager: vi.fn(),
+	getVenueTemplateManager: vi.fn(),
 	getRetrievalManager: vi.fn(),
 	getSubscriptionEntitlement: vi.fn(),
 	startSubscriptionTrial: vi.fn(),
@@ -115,7 +116,8 @@ vi.mock("vscode", () => {
 		},
 		Uri: {
 			file: vi.fn((fsPath: string) => ({ fsPath })),
-      parse,
+			parse,
+		},
 		env: {
 			openExternal,
 		},
@@ -186,6 +188,9 @@ import { resolveImageMentions } from "../../mentions/resolveImageMentions"
 describe("webviewMessageHandler - ReadPaper PDF analysis picker", () => {
 	beforeEach(() => {
 		vi.clearAllMocks()
+		mockClineProvider.getVenueTemplateManager = vi.fn().mockReturnValue({
+			copySkillToProject: vi.fn().mockResolvedValue(true),
+		})
 	})
 
 	it("returns normalized initial PDF paths without opening the picker", async () => {
@@ -203,10 +208,28 @@ describe("webviewMessageHandler - ReadPaper PDF analysis picker", () => {
 		})
 
 		expect(vscode.window.showOpenDialog).not.toHaveBeenCalled()
+		expect(mockClineProvider.getVenueTemplateManager).toHaveBeenCalled()
 		expect(mockClineProvider.postMessageToWebview).toHaveBeenCalledWith({
 			type: "readPaperAnalysisPdfsSelected",
 			values: { pdfPaths: ["D:\\papers\\a.pdf", "D:\\papers\\b.PDF"] },
 		})
+	})
+
+	it("provisions the paper-analyst skill into the workspace before analysis", async () => {
+		const copySkillToProject = vi.fn().mockResolvedValue(true)
+		mockClineProvider.getVenueTemplateManager = vi.fn().mockReturnValue({
+			copySkillToProject,
+		})
+
+		await webviewMessageHandler(mockClineProvider, {
+			type: "readPaperSelectAnalysisPdfs",
+			values: {
+				cwd: "D:\\workspace",
+				initialPaths: ["D:\\workspace\\reference\\paper.pdf"],
+			},
+		})
+
+		expect(copySkillToProject).toHaveBeenCalledWith("paper-analyst", "D:\\workspace")
 	})
 
 	it("posts an empty selection when the PDF picker is canceled", async () => {
@@ -348,9 +371,9 @@ describe("webviewMessageHandler - newTask", () => {
 			{ mode: "sci-lit-review" },
 		)
 		expect(mockClineProvider.postMessageToWebview).toHaveBeenCalledWith({ type: "invoke", invoke: "newChat" })
-    })
+	})
 })
-  
+
 describe("webviewMessageHandler - premium gating", () => {
 	beforeEach(() => {
 		vi.clearAllMocks()

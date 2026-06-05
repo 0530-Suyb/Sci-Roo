@@ -134,6 +134,24 @@ export class VenueTemplateManager {
 	}
 
 	/**
+	 * Copy a single built-in skill to the target project's .roo/skills/ directory.
+	 * Returns true when the skill exists in extension resources and has been copied.
+	 */
+	async copySkillToProject(skillName: string, projectRoot: string): Promise<boolean> {
+		const srcDir = path.join(this.skillsDir, skillName)
+		try {
+			await fs.access(srcDir)
+		} catch {
+			return false
+		}
+
+		const destDir = path.join(projectRoot, ".roo", "skills", skillName)
+		await fs.mkdir(destDir, { recursive: true })
+		await this.copyDir(srcDir, destDir)
+		return true
+	}
+
+	/**
 	 * Copy built-in rule files to the target project's .roo/rules-sci-paper-writing/ directory.
 	 * Only copies rules listed in the directory template's ruleFiles array.
 	 */

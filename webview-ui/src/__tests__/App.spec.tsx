@@ -4,6 +4,7 @@ import React from "react"
 import { render, screen, act, cleanup } from "@/utils/test-utils"
 
 import AppWithProviders from "../App"
+import { vscode } from "@src/utils/vscode"
 
 vi.mock("@src/utils/vscode", () => ({
 	vscode: {
@@ -88,6 +89,39 @@ vi.mock("@src/components/cloud/CloudView", () => ({
 	},
 }))
 
+vi.mock("@src/components/read-paper/ReadPaperView", () => ({
+	__esModule: true,
+	default: function ReadPaperView({
+		onDone,
+		onOpenAnalysisChat,
+	}: {
+		onDone: () => void
+		onOpenAnalysisChat?: (options: any) => void
+	}) {
+		return (
+			<div data-testid="readpaper-view">
+				<button data-testid="readpaper-done" onClick={onDone}>
+					Done
+				</button>
+				<button
+					data-testid="readpaper-open-analysis-chat"
+					onClick={() =>
+						onOpenAnalysisChat?.({
+							mode: "sci-lit-review",
+							prompt: "Analyze selected PDFs",
+							workspacePath: "C:\\workspace",
+							autoRun: true,
+							nonInteractive: true,
+							autoApprovalConfiguration: { autoApprovalEnabled: true },
+						})
+					}>
+					Open analysis chat
+				</button>
+			</div>
+		)
+	},
+}))
+
 const mockUseExtensionState = vi.fn()
 
 // Mock i18next and react-i18next
@@ -157,6 +191,8 @@ vi.mock("process.env", () => ({
 }))
 
 describe("App", () => {
+	const mockPostMessage = vi.mocked(vscode.postMessage)
+
 	beforeEach(() => {
 		vi.clearAllMocks()
 		window.removeEventListener("message", () => {})
@@ -187,12 +223,12 @@ describe("App", () => {
 		window.dispatchEvent(messageEvent)
 	}
 
-	it("shows chat view by default", () => {
+	it("renders chat view by default", () => {
 		render(<AppWithProviders />)
 
 		const chatView = screen.getByTestId("chat-view")
 		expect(chatView).toBeInTheDocument()
-		expect(chatView.getAttribute("data-hidden")).toBe("false")
+		expect(chatView.getAttribute("data-hidden")).toBe("true")
 	}, 10000)
 
 	it("switches to settings view when receiving settingsButtonClicked action", async () => {
@@ -289,5 +325,52 @@ describe("App", () => {
 		const chatView = screen.getByTestId("chat-view")
 		expect(chatView.getAttribute("data-hidden")).toBe("false")
 		expect(screen.queryByTestId("marketplace-view")).not.toBeInTheDocument()
+	})
+
+	it("opens an auto-run chat task from ReadPaper analysis", async () => {
+		mockUseExtensionState.mockReturnValue({
+			didHydrateState: true,
+			showWelcome: false,
+			shouldShowAnnouncement: false,
+			experiments: {},
+			language: "en",
+			telemetrySetting: "enabled",
+			subscriptionEntitlement: {
+				tier: "plus",
+				capabilities: {
+					readPaper: true,
+					researchPipeline: true,
+					dataStudio: true,
+					paperWriting: true,
+				},
+			},
+		})
+
+		render(<AppWithProviders />)
+
+		act(() => {
+			triggerMessage("readPaperButtonClicked")
+		})
+
+		const readPaperView = await screen.findByTestId("readpaper-view")
+		expect(readPaperView).toBeInTheDocument()
+
+		act(() => {
+			screen.getByTestId("readpaper-open-analysis-chat").click()
+		})
+
+		expect(mockPostMessage).toHaveBeenCalledWith(
+			expect.objectContaining({
+				type: "newTask",
+				text: "Analyze selected PDFs",
+				taskWorkspacePath: "C:\\workspace",
+				nonInteractive: true,
+				taskConfiguration: { mode: "sci-lit-review" },
+				taskAutoApprovalConfiguration: { autoApprovalEnabled: true },
+			}),
+		)
+
+		const chatView = screen.getByTestId("chat-view")
+		expect(chatView.getAttribute("data-hidden")).toBe("false")
 	})
 })

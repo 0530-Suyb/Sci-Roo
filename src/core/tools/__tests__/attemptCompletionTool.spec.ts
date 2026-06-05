@@ -76,6 +76,9 @@ describe("attemptCompletionTool", () => {
 			todoList: undefined,
 			say: vi.fn().mockResolvedValue(undefined),
 			ask: vi.fn().mockResolvedValue({ response: "yesButtonClicked", text: "", images: [] }),
+			isNonInteractiveTask: vi.fn().mockReturnValue(false),
+			markTaskCompleted: vi.fn(),
+			clineMessages: [],
 			emitFinalTokenUsageUpdate: vi.fn(),
 			emit: vi.fn(),
 			getTokenUsage: vi.fn().mockReturnValue({}),
@@ -507,6 +510,7 @@ describe("attemptCompletionTool", () => {
 
 				expect(mockHandleError).not.toHaveBeenCalled()
 				expect(mockCaptureTaskCompleted).toHaveBeenCalledWith("task_1")
+				expect(mockTask.markTaskCompleted).toHaveBeenCalled()
 				expect(mockTask.emit).toHaveBeenCalledWith(
 					RooCodeEventName.TaskCompleted,
 					"task_1",
@@ -549,6 +553,66 @@ describe("attemptCompletionTool", () => {
 					expect.anything(),
 				)
 				expect(mockPushToolResult).toHaveBeenCalledWith(expect.stringContaining("<user_message>"))
+			})
+
+			it("skips completion confirmation ask for non-interactive tasks", async () => {
+				const block: AttemptCompletionToolUse = {
+					type: "tool_use",
+					name: "attempt_completion",
+					params: { result: "analysis done" },
+					nativeArgs: { result: "analysis done" },
+					partial: false,
+				}
+
+				mockTask.isNonInteractiveTask = vi.fn().mockReturnValue(true)
+
+				const callbacks: AttemptCompletionCallbacks = {
+					askApproval: mockAskApproval,
+					handleError: mockHandleError,
+					pushToolResult: mockPushToolResult,
+					askFinishSubTaskApproval: mockAskFinishSubTaskApproval,
+					toolDescription: mockToolDescription,
+				}
+
+				await attemptCompletionTool.handle(mockTask as Task, block, callbacks)
+
+				expect(mockTask.say).toHaveBeenCalledWith("completion_result", "analysis done", undefined, false)
+				expect(mockTask.ask).not.toHaveBeenCalled()
+				expect(mockTask.markTaskCompleted).toHaveBeenCalled()
+				expect(mockCaptureTaskCompleted).toHaveBeenCalledWith("task_1")
+			})
+
+			it("does not append duplicate completion_result messages", async () => {
+				const block: AttemptCompletionToolUse = {
+					type: "tool_use",
+					name: "attempt_completion",
+					params: { result: "analysis done" },
+					nativeArgs: { result: "analysis done" },
+					partial: false,
+				}
+
+				mockTask.clineMessages = [
+					{
+						type: "say",
+						say: "completion_result",
+						text: "analysis done",
+						ts: Date.now(),
+						partial: false,
+					} as any,
+				]
+
+				const callbacks: AttemptCompletionCallbacks = {
+					askApproval: mockAskApproval,
+					handleError: mockHandleError,
+					pushToolResult: mockPushToolResult,
+					askFinishSubTaskApproval: mockAskFinishSubTaskApproval,
+					toolDescription: mockToolDescription,
+				}
+
+				await attemptCompletionTool.handle(mockTask as Task, block, callbacks)
+
+				expect(mockTask.say).not.toHaveBeenCalledWith("completion_result", "analysis done", undefined, false)
+				expect(mockTask.ask).toHaveBeenCalled()
 			})
 		})
 	})
