@@ -1,3 +1,6 @@
+import * as path from "path"
+import * as vscode from "vscode"
+
 import type { ClineProvider } from "./ClineProvider"
 import { createDefaultReadPaperWorkspaceConfig, type WebviewMessage } from "@roo-code/types"
 
@@ -24,6 +27,62 @@ function prepareManager(provider: ClineProvider, message?: WebviewMessage) {
 		manager.setWorkspaceCwd(cwd)
 	}
 	return manager
+}
+
+function normalizeReadPaperAnalysisPdfPaths(paths: unknown): string[] {
+	if (!Array.isArray(paths)) return []
+
+	const seen = new Set<string>()
+	const result: string[] = []
+
+	for (const value of paths) {
+		if (typeof value !== "string") continue
+
+		const trimmed = value.trim()
+		const key = trimmed.toLowerCase()
+		if (!trimmed || !key.endsWith(".pdf") || seen.has(key)) continue
+
+		seen.add(key)
+		result.push(trimmed)
+	}
+
+	return result
+}
+
+export async function handleReadPaperSelectAnalysisPdfs(
+	provider: ClineProvider,
+	message: WebviewMessage,
+): Promise<void> {
+	const initialPaths = normalizeReadPaperAnalysisPdfPaths(message.values?.initialPaths)
+
+	if (initialPaths.length > 0) {
+		await provider.postMessageToWebview({
+			type: "readPaperAnalysisPdfsSelected",
+			values: { pdfPaths: initialPaths },
+		})
+		return
+	}
+
+	const cwd = typeof message.values?.cwd === "string" ? message.values.cwd : provider.cwd
+	const defaultUri = cwd ? vscode.Uri.file(path.join(cwd, "reference")) : undefined
+	const result = await vscode.window.showOpenDialog({
+		canSelectFiles: true,
+		canSelectFolders: false,
+		canSelectMany: true,
+		openLabel: "Analyze PDFs",
+		title: "Select PDFs to analyze",
+		defaultUri,
+		filters: {
+			"PDF files": ["pdf"],
+		},
+	})
+
+	await provider.postMessageToWebview({
+		type: "readPaperAnalysisPdfsSelected",
+		values: {
+			pdfPaths: normalizeReadPaperAnalysisPdfPaths(result?.map((uri) => uri.fsPath) ?? []),
+		},
+	})
 }
 
 async function postState(provider: ClineProvider, selectedRetrievalNo?: string): Promise<void> {

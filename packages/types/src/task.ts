@@ -97,6 +97,8 @@ export interface CreateTaskOptions {
 	workspacePath?: string
 	disabledTools?: ToolName[]
 	todoListEnabled?: boolean
+	/** Task-local auto-approval settings that should not be persisted as global configuration. */
+	autoApprovalOverrides?: RooCodeSettings
 	/** Internal tasks should not block on user-facing asks such as completion approval or API retry prompts. */
 	nonInteractive?: boolean
 	/** Maximum automatic API retries for non-interactive tasks before aborting. */

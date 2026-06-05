@@ -6,6 +6,7 @@ import {
 	type ExtensionMessage,
 	type SubscriptionCapabilityKey,
 	type SubscriptionTier,
+  type RooCodeSettings,
 	TelemetryEventName,
 } from "@roo-code/types"
 
@@ -47,6 +48,15 @@ type Tab =
 	| "paperWriting"
 
 type ProjectChatBindingKey = "problemFramingTaskId" | "paperDraftTaskId"
+
+type AgentChatOpenOptions = {
+	mode: string
+	prompt: string
+	workspacePath?: string
+	autoRun?: boolean
+	nonInteractive?: boolean
+	autoApprovalConfiguration?: RooCodeSettings
+}
 
 interface PendingProjectChatBinding {
 	bindingKey: ProjectChatBindingKey
@@ -328,6 +338,33 @@ const App = () => {
 			}
 
 			setPendingProjectChatBinding({ bindingKey, projectRoot })
+			vscode.postMessage({ type: "clearTask" } as any)
+			vscode.postMessage({ type: "mode", text: mode } as any)
+			switchTab("chat")
+			window.setTimeout(() => {
+				vscode.postMessage({ type: "insertTextIntoTextarea", text: prompt } as any)
+			}, 50)
+		},
+		[switchTab],
+	)
+
+	const openAgentChat = useCallback(
+		({ mode, prompt, workspacePath, autoRun, nonInteractive, autoApprovalConfiguration }: AgentChatOpenOptions) => {
+			setPendingProjectChatBinding(null)
+
+			if (autoRun) {
+				vscode.postMessage({
+					type: "newTask",
+					text: prompt,
+					taskWorkspacePath: workspacePath,
+					nonInteractive,
+					taskConfiguration: { mode },
+					taskAutoApprovalConfiguration: autoApprovalConfiguration,
+				} as any)
+				switchTab("chat")
+				return
+			}
+
 			vscode.postMessage({ type: "clearTask" } as any)
 			vscode.postMessage({ type: "mode", text: mode } as any)
 			switchTab("chat")

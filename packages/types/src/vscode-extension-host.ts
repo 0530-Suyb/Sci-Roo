@@ -110,6 +110,7 @@ export interface ExtensionMessage {
 		| "literatureExportResult"
 		| "readPaperRetrievalState"
 		| "readPaperWorkspaceConfig"
+		| "readPaperAnalysisPdfsSelected"
 		| "dataStudioState"
 		| "researchPipelineState"
 		| "paperWritingState"
@@ -668,10 +669,14 @@ export interface WebviewMessage {
 		| "readPaperDeleteRetrievalWithImportedEntries"
 		| "readPaperImportCandidate"
 		| "readPaperImportRetrieval"
+		| "readPaperSelectAnalysisPdfs"
 
 	action?: string
 	text?: string
 	taskId?: string
+	/** Task-local workspace path for new tasks; does not change the global VS Code workspace. */
+	taskWorkspacePath?: string
+	nonInteractive?: boolean
 	editedMessageContent?: string
 	tab?: "settings" | "history" | "mcp" | "modes" | "chat" | "marketplace" | "cloud"
 	disabled?: boolean
@@ -788,6 +793,8 @@ export interface WebviewMessage {
 	updatedSettings?: RooCodeSettings
 	/** Task configuration applied via `createTask()` when starting a cloud task. */
 	taskConfiguration?: RooCodeSettings
+	/** Task-local auto-approval settings applied via `CreateTaskOptions` and not persisted globally. */
+	taskAutoApprovalConfiguration?: RooCodeSettings
 	// Worktree properties
 	worktreePath?: string
 	worktreeBranch?: string

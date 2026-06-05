@@ -21,6 +21,7 @@ import {
 	type TaskMetadata,
 	type TaskEvents,
 	type ProviderSettings,
+	type RooCodeSettings,
 	type TokenUsage,
 	type ToolUsage,
 	type ToolName,
@@ -425,6 +426,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 
 	// Initial status for the task's history item (set at creation time to avoid race conditions)
 	private readonly initialStatus?: "active" | "delegated" | "completed"
+	private readonly taskAutoApprovalOverrides?: RooCodeSettings
 
 	// MessageManager for high-level message operations (lazy initialized)
 	private _messageManager?: MessageManager
@@ -452,6 +454,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		nonInteractive,
 		maxAutoRetries,
 		initialStatus,
+		autoApprovalOverrides,
 	}: TaskOptions) {
 		super()
 
@@ -506,6 +509,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		this.taskTodoListEnabled = todoListEnabled
 		this.taskNonInteractive = nonInteractive ?? false
 		this.taskMaxAutoRetries = Math.max(0, Math.floor(maxAutoRetries ?? 1))
+		this.taskAutoApprovalOverrides = autoApprovalOverrides
 
 		this.consecutiveMistakeLimit = consecutiveMistakeLimit ?? DEFAULT_CONSECUTIVE_MISTAKE_LIMIT
 		this.providerRef = new WeakRef(provider)
@@ -1392,7 +1396,12 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		// Automatically approve if the ask according to the user's settings.
 		const provider = this.providerRef.deref()
 		const state = provider ? await provider.getState() : undefined
-		const approval = await checkAutoApproval({ state, ask: type, text, isProtected })
+		const approval = await checkAutoApproval({
+			state: this.mergeTaskAutoApprovalState(state),
+			ask: type,
+			text,
+			isProtected,
+		})
 
 		if (approval.decision === "approve") {
 			this.approveAsk()
@@ -1543,6 +1552,14 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		}
 
 		return undefined
+	}
+
+	private mergeTaskAutoApprovalState<T extends object>(state: T | undefined): (T & RooCodeSettings) | undefined {
+		if (!this.taskAutoApprovalOverrides) {
+			return state as (T & RooCodeSettings) | undefined
+		}
+
+		return { ...(state ?? {}), ...this.taskAutoApprovalOverrides } as T & RooCodeSettings
 	}
 
 	private shouldRetryNonInteractive(retryAttempt: number): boolean {
@@ -4269,7 +4286,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 
 		// Check auto-approval limits
 		const approvalResult = await this.autoApprovalHandler.checkAutoApprovalLimits(
-			state,
+			this.mergeTaskAutoApprovalState(state),
 			this.combineMessages(this.clineMessages.slice(1)),
 			async (type, data) => this.ask(type, data),
 		)
