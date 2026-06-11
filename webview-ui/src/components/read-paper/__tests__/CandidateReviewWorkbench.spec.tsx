@@ -44,7 +44,7 @@ const candidates = [
 		candidate_no: "C-004",
 		title: "Imported paper",
 		state: "已导入",
-		reference_status: { libraryImported: true },
+		reference_status: { libraryImported: true, hasAnalysis: true },
 	}),
 ]
 
@@ -94,7 +94,12 @@ describe("CandidateReviewWorkbench", () => {
 	it("marks Pending as selected when pending candidates exist", () => {
 		renderWorkbench()
 
-		expect(screen.getByRole("button", { name: "Filter candidates, Pending 2" })).toBeInTheDocument()
+		expect(screen.getByRole("button", { name: "Show Pending candidates, 2" })).toHaveAttribute(
+			"aria-pressed",
+			"true",
+		)
+		expect(screen.getByRole("button", { name: "Show Imported candidates, 1" })).toBeInTheDocument()
+		expect(screen.getByRole("button", { name: "Show Analyzed candidates, 1" })).toBeInTheDocument()
 		expect(screen.getByText("Pending paper")).toBeInTheDocument()
 		expect(screen.getByText("Legacy confirmed paper")).toBeInTheDocument()
 	})
@@ -103,12 +108,22 @@ describe("CandidateReviewWorkbench", () => {
 		const user = userEvent.setup()
 		render(<ControlledWorkbench />)
 
-		await user.click(screen.getByRole("button", { name: "Filter candidates, Pending 2" }))
-		await user.click(screen.getByRole("menuitem", { name: "Excluded 1" }))
+		await user.click(screen.getByRole("button", { name: "Show Excluded candidates, 1" }))
 
 		expect(screen.getByText("Excluded paper")).toBeInTheDocument()
 		expect(screen.queryByText("Pending paper")).not.toBeInTheDocument()
 		expect(screen.queryByText("Legacy confirmed paper")).not.toBeInTheDocument()
+	})
+
+	it("shows analyzed candidates without opening a dropdown", async () => {
+		const user = userEvent.setup()
+		render(<ControlledWorkbench />)
+
+		await user.click(screen.getByRole("button", { name: "Show Analyzed candidates, 1" }))
+
+		expect(screen.getByText("Imported paper")).toBeInTheDocument()
+		expect(screen.getAllByText("Analyzed").length).toBeGreaterThan(0)
+		expect(screen.queryByText("Pending paper")).not.toBeInTheDocument()
 	})
 
 	it("renders a filter-specific empty state", () => {

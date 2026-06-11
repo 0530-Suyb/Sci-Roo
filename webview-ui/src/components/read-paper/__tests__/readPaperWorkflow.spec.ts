@@ -131,10 +131,10 @@ describe("readPaperWorkflow", () => {
 				candidate({ candidate_no: "candidate_0003", state: "已排除" }),
 				candidate({
 					candidate_no: "candidate_0004",
-					reference_status: { libraryImported: true },
+					reference_status: { libraryImported: true, hasAnalysis: true },
 				}),
 			]),
-		).toEqual({ all: 4, pending: 2, excluded: 1, imported: 1 })
+		).toEqual({ all: 4, pending: 2, excluded: 1, imported: 1, analyzed: 1 })
 	})
 
 	it("defaults to Pending only when pending candidates exist", () => {
@@ -146,6 +146,11 @@ describe("readPaperWorkflow", () => {
 	it("filters imported candidates independently from candidate decision state", () => {
 		const imported = candidate({ reference_status: { libraryImported: true } })
 		expect(filterCandidates([candidate(), imported], "Imported")).toEqual([imported])
+	})
+
+	it("filters candidates with generated analysis output", () => {
+		const analyzed = candidate({ reference_status: { hasAnalysis: true } })
+		expect(filterCandidates([candidate(), analyzed], "Analyzed")).toEqual([analyzed])
 	})
 
 	it("treats legacy confirmed candidates as pending in review filters", () => {

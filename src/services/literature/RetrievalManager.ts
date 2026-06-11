@@ -67,9 +67,11 @@ type RetrievalCandidateWithReferenceStatus = RetrievalCandidate & {
 		libraryImported: boolean
 		hasReferenceEntry: boolean
 		hasPdf: boolean
+		hasAnalysis: boolean
 		libraryEntryId?: string
 		citeKey?: string
 		pdfPath?: string
+		analysisPath?: string
 	}
 }
 
@@ -191,6 +193,7 @@ export class RetrievalManager {
 							.getReadPaperCandidateReferenceStatus(candidate, { cwd: this.cwd })
 							.catch(() => undefined)
 					: undefined
+				const analysisStatus = await this.getCandidateAnalysisStatus(referenceStatus?.pdfPath)
 
 				return {
 					...candidate,
@@ -198,15 +201,32 @@ export class RetrievalManager {
 						libraryImported: Boolean(libraryEntry),
 						hasReferenceEntry: referenceStatus?.hasEntry ?? false,
 						hasPdf: referenceStatus?.hasPdf ?? false,
+						hasAnalysis: analysisStatus.hasAnalysis,
 						libraryEntryId: libraryEntry?.id,
 						citeKey: referenceStatus?.citeKey,
 						pdfPath: referenceStatus?.pdfPath,
+						analysisPath: analysisStatus.analysisPath,
 					},
 				}
 			}),
 		)
 
 		return { ...retrieval, candidates }
+	}
+
+	private async getCandidateAnalysisStatus(
+		pdfPath?: string,
+	): Promise<{ hasAnalysis: boolean; analysisPath?: string }> {
+		const cwd = this.cwd
+		if (!cwd || !pdfPath) return { hasAnalysis: false }
+
+		const expectedAnalysisPath = path.join(cwd, "reference", "analysis", `${path.parse(pdfPath).name}.md`)
+		try {
+			await fs.access(expectedAnalysisPath)
+			return { hasAnalysis: true, analysisPath: expectedAnalysisPath }
+		} catch {
+			return { hasAnalysis: false }
+		}
 	}
 
 	async updateWorkspaceConfig(updates: Partial<ReadPaperWorkspaceConfig>): Promise<ReadPaperWorkspaceConfig> {
