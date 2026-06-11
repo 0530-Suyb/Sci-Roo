@@ -201,36 +201,6 @@ const ReadPaperWorkspaceShell: React.FC<ReadPaperWorkspaceShellProps> = ({
 		</nav>
 	)
 
-	const renderDirectoryPlaceholder = ({
-		icon: Icon,
-		title,
-		description,
-		rows,
-	}: {
-		icon: React.ComponentType<{ className?: string }>
-		title: string
-		description: string
-		rows: Array<{ label: string; value?: string | number }>
-	}) => (
-		<section className="space-y-3">
-			<div className="flex items-center gap-2">
-				<Icon className="h-3.5 w-3.5 shrink-0" />
-				<h4 className="truncate text-xs font-semibold">{title}</h4>
-			</div>
-			<p className="text-xs text-muted-foreground">{description}</p>
-			<div className="space-y-2">
-				{rows.map((row) => (
-					<div
-						key={row.label}
-						className="flex items-center justify-between gap-2 rounded-md border border-vscode-panel-border px-2 py-2 text-xs">
-						<span className="truncate">{row.label}</span>
-						{row.value !== undefined && <span className="shrink-0 text-muted-foreground">{row.value}</span>}
-					</div>
-				))}
-			</div>
-		</section>
-	)
-
 	const renderRetrievalDirectory = () => (
 		<>
 			<RetrievalSessionDirectory
@@ -269,51 +239,7 @@ const ReadPaperWorkspaceShell: React.FC<ReadPaperWorkspaceShellProps> = ({
 		</>
 	)
 
-	const renderModuleDirectory = () => {
-		if (activeModule === "retrieval") {
-			return renderRetrievalDirectory()
-		}
-		if (activeModule === "library") {
-			return renderDirectoryPlaceholder({
-				icon: Library,
-				title: "Library directory",
-				description: "文献库目录会承载 collection、tag 和 source filter。",
-				rows: [
-					{ label: "All papers", value: libraryStats?.totalEntries ?? libraryEntries.length },
-					{ label: "Unread", value: libraryStats?.unreadCount ?? 0 },
-					{ label: "Tags", value: libraryStats?.tagCount ?? 0 },
-				],
-			})
-		}
-		if (activeModule === "map") {
-			return renderDirectoryPlaceholder({
-				icon: Map,
-				title: "Map directory",
-				description: "文献地图目录会承载 topic cluster、relation graph 和 snapshot。",
-				rows: [
-					{ label: "Current retrieval", value: selectedRetrieval?.candidates?.length ?? 0 },
-					{ label: "Library papers", value: libraryStats?.totalEntries ?? libraryEntries.length },
-					{ label: "Graph model", value: "draft" },
-				],
-			})
-		}
-		return renderDirectoryPlaceholder({
-			icon: Settings2,
-			title: "Settings directory",
-			description: "设置目录会承载 profile、model preset 和 database preset。",
-			rows: [
-				{ label: "Planner profile", value: workspaceForm.planner_profile_name || "Default" },
-				{
-					label: "Strategy",
-					value:
-						workspaceForm.default_retrieval_strategy === "scholarly_plus_web_discovery"
-							? "APIs + discovery"
-							: "APIs",
-				},
-				{ label: "Sources", value: workspaceForm.default_sources.length },
-			],
-		})
-	}
+	const renderModuleDirectory = () => renderRetrievalDirectory()
 
 	const renderDirectoryRail = () => (
 		<div className="flex h-11 min-h-0 items-center gap-2 border-b border-vscode-panel-border px-2 py-1.5 lg:h-full lg:flex-col lg:border-b-0 lg:border-r">
@@ -424,6 +350,8 @@ const ReadPaperWorkspaceShell: React.FC<ReadPaperWorkspaceShellProps> = ({
 		</section>
 	)
 
+	const showDirectoryPane = activeModule === "retrieval"
+
 	return (
 		<Tab>
 			<TabHeader>
@@ -446,23 +374,26 @@ const ReadPaperWorkspaceShell: React.FC<ReadPaperWorkspaceShellProps> = ({
 				<div
 					className={cn(
 						"grid h-full min-h-0 min-w-0 grid-cols-1 overflow-hidden",
-						directoryCollapsed
-							? "grid-rows-[44px_minmax(0,1fr)] lg:grid-cols-[44px_minmax(0,1fr)] lg:grid-rows-1"
-							: "lg:grid-cols-[clamp(220px,18vw,260px)_minmax(0,1fr)]",
+						showDirectoryPane &&
+							(directoryCollapsed
+								? "grid-rows-[44px_minmax(0,1fr)] lg:grid-cols-[44px_minmax(0,1fr)] lg:grid-rows-1"
+								: "lg:grid-cols-[clamp(220px,18vw,260px)_minmax(0,1fr)]"),
 					)}>
-					<aside
-						className={cn(
-							"min-h-0 min-w-0 overflow-hidden",
-							!directoryCollapsed && "border-r border-vscode-panel-border",
-						)}>
-						{directoryCollapsed ? (
-							renderDirectoryRail()
-						) : (
-							<div className="h-full min-h-0 overflow-y-auto overflow-x-hidden p-2">
-								<div className="space-y-3">{renderModuleDirectory()}</div>
-							</div>
-						)}
-					</aside>
+					{showDirectoryPane && (
+						<aside
+							className={cn(
+								"min-h-0 min-w-0 overflow-hidden",
+								!directoryCollapsed && "border-r border-vscode-panel-border",
+							)}>
+							{directoryCollapsed ? (
+								renderDirectoryRail()
+							) : (
+								<div className="h-full min-h-0 overflow-y-auto overflow-x-hidden p-2">
+									<div className="space-y-3">{renderModuleDirectory()}</div>
+								</div>
+							)}
+						</aside>
+					)}
 
 					<main className="min-h-0 min-w-0 overflow-y-auto overflow-x-hidden p-4">
 						{activeModule === "retrieval" ? (

@@ -31,9 +31,11 @@ export type RetrievalCandidate = {
 		libraryImported?: boolean
 		hasReferenceEntry?: boolean
 		hasPdf?: boolean
+		hasAnalysis?: boolean
 		libraryEntryId?: string
 		citeKey?: string
 		pdfPath?: string
+		analysisPath?: string
 	}
 }
 
@@ -105,13 +107,14 @@ export type WorkspaceFormState = {
 
 export type ReadPaperWorkflowState = "Draft" | "Ready" | "Running" | "Results Ready" | "Reviewed" | "Archived"
 
-export type CandidateFilter = "All" | "Pending" | "Excluded" | "Imported"
+export type CandidateFilter = "All" | "Pending" | "Imported" | "Analyzed" | "Excluded"
 
 export type CandidateReviewCounts = {
 	all: number
 	pending: number
 	excluded: number
 	imported: number
+	analyzed: number
 }
 
 export type DraftMode = "unsynced" | "seeded_from_defaults" | "bound_to_retrieval"

@@ -69,6 +69,8 @@ export function CandidateListItem({
 	const candidateIsExcluded = candidate.state === "已排除"
 	const candidateReferencePdfPath = candidate.reference_status?.pdfPath
 	const candidateHasReferencePdf = Boolean(candidate.reference_status?.hasPdf)
+	const candidateAnalysisPath = candidate.reference_status?.analysisPath
+	const candidateHasAnalysis = Boolean(candidate.reference_status?.hasAnalysis)
 	const candidateNeedsReferenceDownload =
 		candidateSupportsArxivDownload && candidateIsImported && !candidateHasReferencePdf
 	const candidatePdfAlreadyDownloaded =
@@ -102,6 +104,11 @@ export function CandidateListItem({
 						<span>{candidate.candidate_no}</span>
 						<span>{candidateStatusLabel}</span>
 						{candidateHasReferencePdf && <span>PDF</span>}
+						{candidateHasAnalysis && (
+							<span title={candidateAnalysisPath} className="text-vscode-testing-iconPassed">
+								Analyzed
+							</span>
+						)}
 					</div>
 
 					{candidate.relevance_reason && (

@@ -1,14 +1,7 @@
 import type { ReactNode } from "react"
 import { Check, ListFilter } from "lucide-react"
 
-import {
-	Button,
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuTrigger,
-	StandardTooltip,
-} from "@/components/ui"
+import { Button, StandardTooltip } from "@/components/ui"
 import { cn } from "@/lib/utils"
 import { CandidateListItem } from "./CandidateListItem"
 import type {
@@ -40,26 +33,29 @@ export type CandidateReviewWorkbenchProps = {
 const FILTERS: Array<{ value: CandidateFilter; label: string; countKey: keyof CandidateReviewCounts }> = [
 	{ value: "All", label: "All", countKey: "all" },
 	{ value: "Pending", label: "Pending", countKey: "pending" },
-	{ value: "Excluded", label: "Excluded", countKey: "excluded" },
 	{ value: "Imported", label: "Imported", countKey: "imported" },
+	{ value: "Analyzed", label: "Analyzed", countKey: "analyzed" },
+	{ value: "Excluded", label: "Excluded", countKey: "excluded" },
 ]
 
 const EMPTY_TITLES: Record<CandidateFilter, string> = {
 	All: "No retrieval candidates yet",
 	Pending: "No pending candidates",
-	Excluded: "No excluded candidates",
 	Imported: "No imported candidates",
+	Analyzed: "No analyzed papers",
+	Excluded: "No excluded candidates",
 }
 
 const EMPTY_DESCRIPTIONS: Record<CandidateFilter, string> = {
 	All: "Run a retrieval to populate the review list.",
 	Pending: "All candidates in this retrieval have already been excluded or imported.",
-	Excluded: "No candidates have been excluded in this retrieval.",
 	Imported: "No candidates from this retrieval have been imported into the library.",
+	Analyzed: "No imported local PDFs have a matching Markdown analysis in reference/analysis yet.",
+	Excluded: "No candidates have been excluded in this retrieval.",
 }
 
 const getFallbackFilter = (candidateCounts: CandidateReviewCounts): CandidateFilter =>
-	candidateCounts.pending > 0 ? "Pending" : "All"
+	candidateCounts.pending > 0 ? "Pending" : candidateCounts.imported > 0 ? "Imported" : "All"
 
 export function CandidateReviewWorkbench({
 	candidateFilter,
@@ -79,12 +75,11 @@ export function CandidateReviewWorkbench({
 }: CandidateReviewWorkbenchProps) {
 	const fallbackFilter = getFallbackFilter(candidateCounts)
 	const showFallbackAction = candidateCounts.all > 0 && candidateFilter !== fallbackFilter
-	const activeFilter = FILTERS.find((filter) => filter.value === candidateFilter) ?? FILTERS[0]
-	const activeFilterCount = candidateCounts[activeFilter.countKey]
 	const reviewSummary = [
 		`${candidateCounts.pending} pending`,
-		`${candidateCounts.excluded} excluded`,
 		`${candidateCounts.imported} imported`,
+		`${candidateCounts.analyzed} analyzed`,
+		`${candidateCounts.excluded} excluded`,
 	].join(" · ")
 
 	return (
@@ -97,41 +92,39 @@ export function CandidateReviewWorkbench({
 					</div>
 					<div className="mt-0.5 truncate text-xs text-muted-foreground">{reviewSummary}</div>
 				</div>
-				<div className="flex min-w-0 shrink-0 flex-wrap items-center gap-2">
-					<DropdownMenu>
-						<StandardTooltip content="Filter candidate review list">
-							<DropdownMenuTrigger asChild>
-								<Button
-									variant="outline"
-									size="sm"
-									aria-label={`Filter candidates, ${activeFilter.label} ${activeFilterCount}`}
-									className="min-w-28 justify-between">
-									<ListFilter className="h-3.5 w-3.5" aria-hidden="true" />
-									<span>{activeFilter.label}</span>
-									<span className="tabular-nums text-muted-foreground">{activeFilterCount}</span>
-								</Button>
-							</DropdownMenuTrigger>
-						</StandardTooltip>
-						<DropdownMenuContent align="end" className="min-w-48">
-							{FILTERS.map((filter) => {
-								const isActive = candidateFilter === filter.value
-								const count = candidateCounts[filter.countKey]
+				<div className="flex min-w-0 shrink-0 flex-wrap items-center gap-1.5">
+					<div
+						className="flex min-w-0 flex-wrap items-center gap-1 rounded-md border border-vscode-panel-border bg-vscode-editorWidget-background p-1"
+						aria-label="Candidate review filters">
+						<ListFilter className="ml-1 h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+						{FILTERS.map((filter) => {
+							const isActive = candidateFilter === filter.value
+							const count = candidateCounts[filter.countKey]
 
-								return (
-									<DropdownMenuItem
-										key={filter.value}
-										onSelect={() => onCandidateFilterChange(filter.value)}
-										className={cn(isActive && "bg-vscode-list-activeSelectionBackground")}>
-										<span className="flex h-4 w-4 items-center justify-center">
-											{isActive && <Check className="h-3.5 w-3.5" aria-hidden="true" />}
-										</span>
+							return (
+								<StandardTooltip
+									key={filter.value}
+									content={`Show ${filter.label.toLowerCase()} papers`}>
+									<Button
+										variant={isActive ? "primary" : "ghost"}
+										size="sm"
+										aria-label={`Show ${filter.label} candidates, ${count}`}
+										aria-pressed={isActive}
+										className={cn(
+											"h-7 gap-1.5 px-2 text-xs",
+											!isActive && "text-vscode-foreground hover:bg-vscode-list-hoverBackground",
+										)}
+										onClick={() => onCandidateFilterChange(filter.value)}>
+										{isActive && <Check className="h-3.5 w-3.5" aria-hidden="true" />}
 										<span>{filter.label}</span>
-										<span className="ml-auto tabular-nums text-muted-foreground">{count}</span>
-									</DropdownMenuItem>
-								)
-							})}
-						</DropdownMenuContent>
-					</DropdownMenu>
+										<span className={cn("tabular-nums", !isActive && "text-muted-foreground")}>
+											{count}
+										</span>
+									</Button>
+								</StandardTooltip>
+							)
+						})}
+					</div>
 				</div>
 			</div>
 

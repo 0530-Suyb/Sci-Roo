@@ -33,9 +33,9 @@ export function LibraryDraftPanel({
 				<div className="flex items-start justify-between gap-3">
 					<div className="min-w-0">
 						<p className="mb-1 text-xs font-medium uppercase text-muted-foreground">Literature Library</p>
-						<h4 className="truncate text-sm font-semibold">Imported papers and local library view</h4>
+						<h4 className="truncate text-sm font-semibold">Imported papers</h4>
 						<p className="mt-1 text-xs text-muted-foreground">
-							This module is a draft shell for paper management and filtering.
+							Local papers imported from retrieval sessions.
 						</p>
 					</div>
 					<div className="flex shrink-0 flex-wrap justify-end gap-2">
@@ -74,7 +74,7 @@ export function LibraryDraftPanel({
 						<div className="text-lg font-semibold">
 							{libraryStats?.totalEntries ?? libraryEntries.length}
 						</div>
-						<div className="text-xs text-muted-foreground">papers</div>
+						<div className="text-xs text-muted-foreground">imported</div>
 					</div>
 					<div className="rounded-md border border-vscode-panel-border p-3">
 						<div className="text-lg font-semibold">{libraryStats?.unreadCount ?? 0}</div>
